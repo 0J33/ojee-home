@@ -874,7 +874,10 @@ function render() {
   }
   const views = { overview: viewOverview, devices: viewDevices, scenes: viewScenes,
                   automations: viewAutomations, activity: viewActivity };
-  root.innerHTML = (views[state.view] || viewOverview)();
+  // Wrapped in .hm so home.css can be scoped to it. Without a root of its
+  // own every rule in that stylesheet was global, and it redefined 33 names
+  // the design system owns — so visiting Home restyled the whole console.
+  root.innerHTML = `<div class="hm">${(views[state.view] || viewOverview)()}</div>`;
   // No renderNav() — the host builds nav from module.json's `views`.
   renderChrome();
   renderEditor();

@@ -1,33 +1,46 @@
+/* ------------------------------------------------------------------
+   Every selector here is scoped to .hm, this module's own root.
+
+   A module stylesheet is injected once and never removed, so anything it
+   defines at global scope keeps applying after you navigate AWAY from the
+   module. Two modules have already broken the console this way by
+   redefining names the design system owns.
+
+   Scoping is mechanical and total on purpose: a module cannot be trusted
+   to remember which class names are shared, and that list grows every
+   time the design system does.
+   ------------------------------------------------------------------ */
+
 /* ============================================================
    home.ojee.net — app layer on top of ojee-ui.
    Every value here resolves to an ojee-ui token. No new colours,
    no border-radius, no non-mono type: the system stays the system.
    ============================================================ */
 
-.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.hm .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 /* icons: one stroke language everywhere — 1.5px, square caps, no fills */
-.ic {
+.hm .ic {
   width: 16px; height: 16px; flex: none;
   fill: none; stroke: currentColor;
   stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter;
 }
-.ic--lg { width: 22px; height: 22px; }
-.ic--xl { width: 30px; height: 30px; }
+.hm .ic--lg { width: 22px; height: 22px; }
+.hm .ic--xl { width: 30px; height: 30px; }
 
-.skip {
+.hm .skip {
   position: absolute; left: -9999px; top: 0; z-index: 999;
   padding: 10px 16px; background: var(--accent); color: #000;
   font-size: 0.65rem; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
 }
-.skip:focus { left: 0; }
+.hm .skip:focus { left: 0; }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hm :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- shell ----------
    Full-height column so the status bar sits on the viewport bottom when a page is short,
    instead of leaving a gap under it. */
-html, body { min-height: 100%; }
+
 
 /* ojee-ui paints `html` with two gradients and no background-COLOR. Gradients only cover the
    document box, so momentum/rubber-band scrolling past either edge exposes the browser's
@@ -37,12 +50,8 @@ html, body { min-height: 100%; }
      2. overscroll-behavior: none, which stops the bounce (and scroll chaining) outright.
    color-scheme: dark additionally tells the browser to paint its own surfaces — scrollbars,
    overscroll gutter, form controls — dark rather than light. */
-html {
-  background-color: #06060a;
-  overscroll-behavior: none;
-  color-scheme: dark;
-}
-body { overscroll-behavior: none; }
+
+
 
 /* The shell owns its own chrome — body layout, .wrap, .hudbar, .nav,
    .tabbar and .statusbar all live in ojee-ui.css, in both mounted and
@@ -54,33 +63,33 @@ body { overscroll-behavior: none; }
    dead space above the tab bar. A module styling the shell is exactly what
    the module contract exists to prevent. */
 
-.section-head {
+.hm .section-head {
   display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
   padding-bottom: var(--s-2); margin-bottom: var(--s-3);
   border-bottom: 1px solid var(--line);
 }
-.section-head .idx { font-family: var(--hud); font-size: 0.6rem; letter-spacing: 0.18em; color: var(--accent); }
-.section-head .spacer { flex: 1; }
+.hm .section-head .idx { font-family: var(--hud); font-size: 0.6rem; letter-spacing: 0.18em; color: var(--accent); }
+.hm .section-head .spacer { flex: 1; }
 
-.stack-lg { display: flex; flex-direction: column; gap: var(--s-4); }
+.hm .stack-lg { display: flex; flex-direction: column; gap: var(--s-4); }
 
 /* ojee-ui's .panel--glowtop and .corners each style `::before` on the element they sit on —
    an element only has one, so combining the classes merges the 14px corner bracket with the
    glow gradient and hover paints a solid cyan block in the top-left. They are alternatives.
    The markup uses .corners; this guard keeps the artifact from coming back if the other
    class is ever added alongside it. */
-.panel--glowtop.corners::before { background: none; opacity: 1; }
+.hm .panel--glowtop.corners::before { background: none; opacity: 1; }
 
 /* ---------- overview tiles ---------- */
 /* 150px floor rather than 190: on a 390px phone that lands two tiles per row, so the
    four-tile summary costs one screen-half instead of a whole screen before any control. */
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; }
+.hm .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; }
 
 /* ---------- device card ---------- */
-.devcard { display: flex; flex-direction: column; gap: var(--s-3); }
-.devcard .devtop { display: flex; align-items: flex-start; gap: 12px; }
-.devcard .devname { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.devcard .devname b {
+.hm .devcard { display: flex; flex-direction: column; gap: var(--s-3); }
+.hm .devcard .devtop { display: flex; align-items: flex-start; gap: 12px; }
+.hm .devcard .devname { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hm .devcard .devname b {
   font-size: 0.95rem; font-weight: 900; text-transform: uppercase;
   letter-spacing: 1px; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -88,7 +97,7 @@ body { overscroll-behavior: none; }
 
 /* Kept for the editor's helper line. The AC controls no longer use it — their meaning is
    carried by the glyphs in .segctl--glyph instead of a paragraph under every group. */
-.hint {
+.hm .hint {
   font-size: 0.62rem; line-height: 1.65; color: var(--dim);
   margin-top: 6px; max-width: 60ch;
 }
@@ -96,139 +105,139 @@ body { overscroll-behavior: none; }
 /* ojee-ui's title block sizes its cells from a 120px grid floor and does not constrain the
    value, so a long one (the host:port link) runs past the cell border. Let it wrap inside
    its own cell instead of escaping it. */
-.titleblock .tb { min-width: 0; }
-.titleblock .tb .tb-v { min-width: 0; overflow-wrap: anywhere; }
+.hm .titleblock .tb { min-width: 0; }
+.hm .titleblock .tb .tb-v { min-width: 0; overflow-wrap: anywhere; }
 
 /* ---------- device panel layout ----------
    The dial column was ~380px against a ~690px control column: 300px of dead space beside the
    most important control on the page. Pairing the four small enum groups two-up halves the
    right column and brings the two into balance. */
-.devgrid {
+.hm .devgrid {
   display: grid;
   grid-template-columns: minmax(260px, 340px) 1fr;
   gap: var(--s-4);
   align-items: start;
 }
-.climate { display: flex; flex-direction: column; gap: var(--s-3); }
-.controls { display: flex; flex-direction: column; gap: var(--s-4); }
-.ctlpair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3) var(--s-4); }
+.hm .climate { display: flex; flex-direction: column; gap: var(--s-3); }
+.hm .controls { display: flex; flex-direction: column; gap: var(--s-4); }
+.hm .ctlpair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3) var(--s-4); }
 @media (max-width: 980px) {
-  .devgrid { grid-template-columns: 1fr; }
-  .climate { max-width: 340px; margin: 0 auto; width: 100%; }
+  .hm .devgrid { grid-template-columns: 1fr; }
+  .hm .climate { max-width: 340px; margin: 0 auto; width: 100%; }
 }
 @media (max-width: 560px) {
-  .ctlpair { grid-template-columns: 1fr; gap: var(--s-3); }
+  .hm .ctlpair { grid-template-columns: 1fr; gap: var(--s-3); }
 }
 
 /* utility actions live in the drawing header, so the panel has exactly one primary action */
-.sheet-actions { display: inline-flex; align-items: center; gap: 8px; }
-.iconbtn {
+.hm .sheet-actions { display: inline-flex; align-items: center; gap: 8px; }
+.hm .iconbtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; flex: none;
   background: var(--panel); color: var(--ink-2);
   border: 1px solid var(--line); cursor: pointer; transition: var(--t);
 }
-.iconbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-03); }
-.iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.hm .iconbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-03); }
+.hm .iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* the one primary action on the panel — full width, unmistakable */
-.powerbtn { width: 100%; justify-content: center; min-height: 52px; letter-spacing: 3px; }
+.hm .powerbtn { width: 100%; justify-content: center; min-height: 52px; letter-spacing: 3px; }
 
 /* ---------- climate dial ---------- */
-.dialwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
-.dial { position: relative; width: 100%; max-width: 260px; aspect-ratio: 1; }
-.dial svg { width: 100%; height: 100%; display: block; }
-.dial .d-track { fill: none; stroke: var(--line-2); stroke-width: 10; }
-.dial .d-fill {
+.hm .dialwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
+.hm .dial { position: relative; width: 100%; max-width: 260px; aspect-ratio: 1; }
+.hm .dial svg { width: 100%; height: 100%; display: block; }
+.hm .dial .d-track { fill: none; stroke: var(--line-2); stroke-width: 10; }
+.hm .dial .d-fill {
   fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: butt;
   filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.45));
   transition: stroke-dasharray 0.45s ease, stroke 0.2s;
 }
-.dial .d-tick { stroke: var(--line); stroke-width: 1; }
-.dial.is-off .d-fill { stroke: var(--dim); filter: none; }
-.dial .d-center {
+.hm .dial .d-tick { stroke: var(--line); stroke-width: 1; }
+.hm .dial.is-off .d-fill { stroke: var(--dim); filter: none; }
+.hm .dial .d-center {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   pointer-events: none;
 }
-.dial .d-set { font-size: 3.1rem; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.dial .d-set sup { font-size: 1.1rem; font-weight: 400; vertical-align: super; color: var(--dim); }
-.dial.is-off .d-set { color: var(--dim); }
+.hm .dial .d-set { font-size: 3.1rem; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hm .dial .d-set sup { font-size: 1.1rem; font-weight: 400; vertical-align: super; color: var(--dim); }
+.hm .dial.is-off .d-set { color: var(--dim); }
 
 /* One bordered control rather than three floating parts: minus, track, plus share a frame so
    the setpoint row reads as a single instrument. */
-.dialbtns {
+.hm .dialbtns {
   display: flex; align-items: stretch; gap: 0;
   border: 1px solid var(--line); background: var(--panel);
 }
-.dialbtns .range { margin: 0 14px; }
+.hm .dialbtns .range { margin: 0 14px; }
 
 /* ojee-ui draws .range as a 2px hairline — correct visually, but a 2px-tall touch target.
    Grow the input to a 44px hit area and move the hairline into the track pseudo-element so
    the design is unchanged and the target is reachable. */
-.dialbtns .range {
+.hm .dialbtns .range {
   height: 44px;
   background: transparent;
   display: block;
 }
-.dialbtns .range::-webkit-slider-runnable-track { height: 2px; background: var(--line); }
-.dialbtns .range::-moz-range-track { height: 2px; background: var(--line); }
-.dialbtns .range::-webkit-slider-thumb { margin-top: -6px; }
-.dialbtns .range:disabled { opacity: 0.4; cursor: not-allowed; }
-.stepbtn {
+.hm .dialbtns .range::-webkit-slider-runnable-track { height: 2px; background: var(--line); }
+.hm .dialbtns .range::-moz-range-track { height: 2px; background: var(--line); }
+.hm .dialbtns .range::-webkit-slider-thumb { margin-top: -6px; }
+.hm .dialbtns .range:disabled { opacity: 0.4; cursor: not-allowed; }
+.hm .stepbtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 52px; flex: none; align-self: stretch;
   background: transparent; color: var(--ink);
   border: 0; cursor: pointer; transition: var(--t);
 }
-.stepbtn:first-child { border-right: 1px solid var(--line); }
-.stepbtn:last-child { border-left: 1px solid var(--line); }
-.stepbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-03); }
-.stepbtn:disabled { color: var(--dim); cursor: not-allowed; opacity: 0.5; }
+.hm .stepbtn:first-child { border-right: 1px solid var(--line); }
+.hm .stepbtn:last-child { border-left: 1px solid var(--line); }
+.hm .stepbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-03); }
+.hm .stepbtn:disabled { color: var(--dim); cursor: not-allowed; opacity: 0.5; }
 
 /* ---------- segmented control ---------- */
-.segctl { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
-.segctl button {
+.hm .segctl { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.hm .segctl button {
   min-height: 44px; padding: 10px 8px;
   background: var(--panel); border: 1px solid var(--line-2);
   font-family: var(--mono); font-size: 0.62rem; font-weight: 900;
   letter-spacing: 1.2px; text-transform: uppercase;
   color: var(--ink-2); cursor: pointer; transition: var(--t);
 }
-.segctl button:hover:not(:disabled) { border-color: #333; color: var(--ink); background: var(--accent-03); }
-.segctl button[aria-pressed="true"] {
+.hm .segctl button:hover:not(:disabled) { border-color: #333; color: var(--ink); background: var(--accent-03); }
+.hm .segctl button[aria-pressed="true"] {
   border-color: var(--accent); color: var(--accent); background: var(--accent-08);
 }
-.segctl button:disabled { color: var(--dim); cursor: not-allowed; opacity: 0.45; }
+.hm .segctl button:disabled { color: var(--dim); cursor: not-allowed; opacity: 0.45; }
 @media (max-width: 480px) {
-  .segctl { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); grid-auto-columns: auto; }
+  .hm .segctl { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); grid-auto-columns: auto; }
 }
 
 /* glyph segments carry meaning in the mark, so they get square cells rather than text width */
 /* Glyph segments: the mark carries the meaning, the caption keeps the precision. */
-.segctl--glyph button {
+.hm .segctl--glyph button {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 8px 4px; min-height: 56px;
 }
-.segctl--glyph .ic { width: 26px; height: 26px; }
-.segctl--glyph .seglabel {
+.hm .segctl--glyph .ic { width: 26px; height: 26px; }
+.hm .segctl--glyph .seglabel {
   font-size: 0.52rem; font-weight: 900; letter-spacing: 1px;
   text-transform: uppercase; line-height: 1;
 }
 /* the appliance block is the fixed reference the arrow is read against */
-.vane .unit { fill: currentColor; stroke: none; opacity: 0.85; }
+.hm .vane .unit { fill: currentColor; stroke: none; opacity: 0.85; }
 /* the sweep arc is the path, not the airflow — hold it back behind the two extreme arrows */
-.vane .sweep { opacity: 0.5; }
-.ecobar ~ .vent, svg .vent { opacity: 0.4; }
-.vane path { stroke-linecap: butt; stroke-linejoin: miter; }
-.ecobar { fill: none; stroke: currentColor; stroke-width: 1.5; }
-.ecoslash { stroke: currentColor; stroke-width: 1.75; opacity: 1; }
-.ecobar.on { fill: currentColor; }
-.segctl--glyph button[aria-pressed="true"] .ecobar.on { fill: var(--accent); stroke: var(--accent); }
+.hm .vane .sweep { opacity: 0.5; }
+.hm .ecobar ~ .vent, .hm svg .vent { opacity: 0.4; }
+.hm .vane path { stroke-linecap: butt; stroke-linejoin: miter; }
+.hm .ecobar { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.hm .ecoslash { stroke: currentColor; stroke-width: 1.75; opacity: 1; }
+.hm .ecobar.on { fill: currentColor; }
+.hm .segctl--glyph button[aria-pressed="true"] .ecobar.on { fill: var(--accent); stroke: var(--accent); }
 
 /* ---------- toggle rows ---------- */
-.togglegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; }
-.togrow {
+.hm .togglegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; }
+.hm .togrow {
   display: flex; align-items: center; gap: 10px;
   min-height: 48px; padding: 10px 14px;
   background: var(--panel); border: 1px solid var(--line-2);
@@ -238,35 +247,35 @@ body { overscroll-behavior: none; }
   color: var(--ink-2);
   cursor: pointer; transition: var(--t);
 }
-.togrow:hover { border-color: #333; background: var(--accent-03); }
-.togrow .tlabel {
+.hm .togrow:hover { border-color: #333; background: var(--accent-03); }
+.hm .togrow .tlabel {
   flex: 1; min-width: 0;
   font-size: 0.62rem; font-weight: 900; letter-spacing: 1.2px;
   text-transform: uppercase; color: var(--ink-2);
 }
-.togrow[data-on="1"] .tlabel, .togrow[data-on="1"] .ic { color: var(--accent); }
-.togrow[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.hm .togrow[data-on="1"] .tlabel, .hm .togrow[data-on="1"] .ic { color: var(--accent); }
+.hm .togrow[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
 
 /* The switch inside a row is decoration — the row owns the interaction. Paint the checked
    look from the row's state instead of an :checked input (see the note in app.js). */
-.togrow .toggle { pointer-events: none; }
-.togrow[data-on="1"] .toggle .track { border-color: var(--accent); background: var(--accent-08); }
-.togrow[data-on="1"] .toggle .track::before {
+.hm .togrow .toggle { pointer-events: none; }
+.hm .togrow[data-on="1"] .toggle .track { border-color: var(--accent); background: var(--accent-08); }
+.hm .togrow[data-on="1"] .toggle .track::before {
   transform: translateX(22px);
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
 }
 
 /* ---------- scene / automation cards ---------- */
-.cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 2px; }
+.hm .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 2px; }
 
-.rule { display: flex; flex-direction: column; gap: 10px; }
-.rule .rulehead { display: flex; align-items: center; gap: 12px; }
-.rule .rulehead b {
+.hm .rule { display: flex; flex-direction: column; gap: 10px; }
+.hm .rule .rulehead { display: flex; align-items: center; gap: 12px; }
+.hm .rule .rulehead b {
   flex: 1; min-width: 0;
   font-size: 0.8rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--ink);
 }
-.rule p { font-size: 0.72rem; color: var(--ink-2); line-height: 1.6; }
+.hm .rule p { font-size: 0.72rem; color: var(--ink-2); line-height: 1.6; }
 
 /* ojee-ui's .fieldline pins the value to one line (`white-space: nowrap; flex: none`) so the
    dotted leader reads correctly for short values like "24 °C". An automation trigger is a
@@ -275,9 +284,9 @@ body { overscroll-behavior: none; }
    Not scoped to a breakpoint on purpose: the card width depends on the grid, not the screen,
    so any max-width guess is wrong at some size. The leader survives for short values; a long
    one simply wraps onto its own line. */
-.rule .fieldline { flex-wrap: wrap; }
-.rule .fieldline .fl-lead { min-width: 12px; }
-.rule .fieldline .fl-v {
+.hm .rule .fieldline { flex-wrap: wrap; }
+.hm .rule .fieldline .fl-lead { min-width: 12px; }
+.hm .rule .fieldline .fl-v {
   white-space: normal;
   overflow-wrap: anywhere;
   flex: 1 1 55%;
@@ -286,83 +295,82 @@ body { overscroll-behavior: none; }
 }
 
 /* an action capability (self-clean) is a button, not a switch — it starts something */
-.togrow--action { font-family: var(--mono); text-align: left; }
-.togrow--action:hover { border-color: var(--accent); }
-.togrow--action .meta { color: var(--accent); }
+.hm .togrow--action { font-family: var(--mono); text-align: left; }
+.hm .togrow--action:hover { border-color: var(--accent); }
+.hm .togrow--action .meta { color: var(--accent); }
 
 /* the automations card switch is a plain element, painted from data-on (see app.js) */
-[data-automation] { cursor: pointer; flex: none; }
-[data-automation][data-on="1"] .track { border-color: var(--accent); background: var(--accent-08); }
-[data-automation][data-on="1"] .track::before {
+.hm [data-automation] { cursor: pointer; flex: none; }
+.hm [data-automation][data-on="1"] .track { border-color: var(--accent); background: var(--accent-08); }
+.hm [data-automation][data-on="1"] .track::before {
   transform: translateX(22px); background: var(--accent); box-shadow: 0 0 8px var(--accent);
 }
 
 /* ---------- editor ---------- */
-.modal { max-width: 560px; }
-.edev { border: 1px solid var(--line-2); padding: var(--s-3); margin-top: var(--s-2); }
-.edev + .edev { margin-top: var(--s-2); }
-.erow {
+.hm .modal { max-width: 560px; }
+.hm .edev { border: 1px solid var(--line-2); padding: var(--s-3); margin-top: var(--s-2); }
+.hm .edev + .edev { margin-top: var(--s-2); }
+.hm .erow {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 9px 0; border-bottom: 1px solid var(--line-2);
 }
-.erow:last-child { border-bottom: 0; }
-.erow .check { flex: 0 0 128px; min-width: 0; }
-.erow .eval { flex: 1 1 200px; min-width: 0; }
-.erow.is-on .check span { color: var(--accent); }
+.hm .erow:last-child { border-bottom: 0; }
+.hm .erow .check { flex: 0 0 128px; min-width: 0; }
+.hm .erow .eval { flex: 1 1 200px; min-width: 0; }
+.hm .erow.is-on .check span { color: var(--accent); }
 /* Compact segments inside the editor — the dialog is narrow and these are secondary. */
-.erow .segctl button { min-height: 36px; padding: 7px 6px; font-size: 0.56rem; letter-spacing: 0.8px; }
+.hm .erow .segctl button { min-height: 36px; padding: 7px 6px; font-size: 0.56rem; letter-spacing: 0.8px; }
 @media (max-width: 560px) {
-  .erow .check { flex: 1 1 100%; }
-  .erow .eval { flex: 1 1 100%; }
+  .hm .erow .check { flex: 1 1 100%; }
+  .hm .erow .eval { flex: 1 1 100%; }
 }
 
-.d-range { opacity: 0.7; margin-top: 2px; }
+.hm .d-range { opacity: 0.7; margin-top: 2px; }
 
 /* ---------- activity ---------- */
-.logline { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 0.73rem; }
-.logline time { font-family: var(--hud); font-size: 0.6rem; letter-spacing: 0.12em; color: var(--dim); flex: none; }
-.logline .lmsg { flex: 1; min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
-.logline .ldot { width: 6px; height: 6px; flex: none; background: var(--dim); }
-.logline.k-command .ldot { background: var(--accent); }
-.logline.k-scene   .ldot { background: var(--info); }
-.logline.k-automation .ldot { background: var(--chart-4); }
-.logline.k-error   .ldot { background: var(--err); }
+.hm .logline { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 0.73rem; }
+.hm .logline time { font-family: var(--hud); font-size: 0.6rem; letter-spacing: 0.12em; color: var(--dim); flex: none; }
+.hm .logline .lmsg { flex: 1; min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.hm .logline .ldot { width: 6px; height: 6px; flex: none; background: var(--dim); }
+.hm .logline.k-command .ldot { background: var(--accent); }
+.hm .logline.k-scene .ldot { background: var(--info); }
+.hm .logline.k-automation .ldot { background: var(--chart-4); }
+.hm .logline.k-error .ldot { background: var(--err); }
 
 /* ---------- empty / skeleton ---------- */
-.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: var(--s-5) var(--s-3); text-align: center; }
-.empty p { font-size: 0.75rem; color: var(--dim); max-width: 42ch; line-height: 1.7; }
+.hm .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: var(--s-5) var(--s-3); text-align: center; }
+.hm .empty p { font-size: 0.75rem; color: var(--dim); max-width: 42ch; line-height: 1.7; }
 
-.skel { background: var(--line-2); animation: skelPulse 1.4s ease-in-out infinite; }
+.hm .skel { background: var(--line-2); animation: skelPulse 1.4s ease-in-out infinite; }
 @keyframes skelPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
 
 /* offline / unconfigured banner sits above the fold, not buried in a card */
-.notice { margin-bottom: var(--s-3); }
+.hm .notice { margin-bottom: var(--s-3); }
 
 /* The drafting sheet header is a two-column baseline row; below ~560px the two halves
    collide into each other, so stack them and drop the leader alignment. */
 @media (max-width: 560px) {
-  .sheet-header { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .sheet-header .right { text-align: left; }
-  .sheet::before { inset: 4px; }
-  .sheet-inner { padding: var(--s-3); }
-  .titleblock { grid-template-columns: repeat(2, 1fr); }
-  .titleblock .tb:nth-child(2n) { border-right: 0; }
-  .titleblock .tb { border-bottom: 1px solid var(--line); }
+  .hm .sheet-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .hm .sheet-header .right { text-align: left; }
+  .hm .sheet::before { inset: 4px; }
+  .hm .sheet-inner { padding: var(--s-3); }
+  .hm .titleblock { grid-template-columns: repeat(2, 1fr); }
+  .hm .titleblock .tb:nth-child(2n) { border-right: 0; }
+  .hm .titleblock .tb { border-bottom: 1px solid var(--line); }
 }
 
 /* Touch minimum. ojee-ui sizes .btn by padding, which lands at 40px on small screens —
    just under the 44px floor. Raise only the hit box; the type and padding stay as designed. */
 @media (max-width: 860px), (pointer: coarse) {
-  .btn, .tab, .gate { min-height: 44px; }
-  .toggle { width: 48px; height: 26px; }
-  .toggle .track::before { width: 16px; height: 16px; top: 4px; left: 4px; }
+  .hm .btn, .hm .tab, .hm .gate { min-height: 44px; }
+  .hm .toggle { width: 48px; height: 26px; }
+  .hm .toggle .track::before { width: 16px; height: 16px; top: 4px; left: 4px; }
   /* 48 - 16 knob - 4 - 4 = 24px of travel at this size */
-  .toggle input:checked + .track::before,
-  .togrow[data-on="1"] .toggle .track::before { transform: translateX(24px); }
+  .hm .toggle input:checked + .track::before, .hm .togrow[data-on="1"] .toggle .track::before { transform: translateX(24px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  .hm *, .hm *::before, .hm *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

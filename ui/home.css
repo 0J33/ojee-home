@@ -19,11 +19,13 @@
 
 .hm .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-/* icons: one stroke language everywhere — 1.5px, square caps, no fills */
+/* Icons are Material Symbols — filled paths, not strokes. This rule is more
+   specific than ojee-ui's, so leaving it stroking is what made every sprite
+   icon in this module vanish: a filled glyph with `fill: none` draws nothing.
+   The two glyphs still drawn by hand below set their own stroke. */
 .hm .ic {
   width: 16px; height: 16px; flex: none;
-  fill: none; stroke: currentColor;
-  stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter;
+  fill: currentColor; stroke: none;
 }
 .hm .ic--lg { width: 22px; height: 22px; }
 .hm .ic--xl { width: 30px; height: 30px; }
@@ -229,9 +231,12 @@
 /* the sweep arc is the path, not the airflow — hold it back behind the two extreme arrows */
 .hm .vane .sweep { opacity: 0.5; }
 .hm .ecobar ~ .vent, .hm svg .vent { opacity: 0.4; }
-.hm .vane path { stroke-linecap: butt; stroke-linejoin: miter; }
+.hm .vane path {
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: butt; stroke-linejoin: miter;
+}
 .hm .ecobar { fill: none; stroke: currentColor; stroke-width: 1.5; }
-.hm .ecoslash { stroke: currentColor; stroke-width: 1.75; opacity: 1; }
+.hm .ecoslash { fill: none; stroke: currentColor; stroke-width: 1.75; opacity: 1; }
 .hm .ecobar.on { fill: currentColor; }
 .hm .segctl--glyph button[aria-pressed="true"] .ecobar.on { fill: var(--accent); stroke: var(--accent); }
 

@@ -70,8 +70,9 @@ restarted by hand:
 * **An outage does not count.** A failure with no answer from the cloud (DNS, connect,
   timeout) is transient: it is not logged every poll and does not spend the budget. A machine
   that cannot reach the internet has learned nothing about its password.
-* **Giving up is not permanent.** After giving up it still tries once an hour, so a password
-  fixed in the meantime heals on its own.
+* **Giving up is not permanent.** The breaker opens for half an hour, then lets one attempt
+  through; each further failure doubles the wait up to six hours. A password corrected in the
+  meantime heals on its own, and a genuinely wrong one backs off instead of hammering.
 
 Set the account in `stack/.env` to enable it:
 

@@ -60,6 +60,19 @@ does not try to predict *when*. It reacts to the fact: any read or command that 
 decrypt triggers a cloud re-fetch and one retry. A rotation now heals inside a single poll,
 whether it was the app, a schedule, or something else that caused it.
 
+The fetch is rate-limited (5 minutes) and gives up after three failures, because retrying a
+wrong password in a poll loop locks the account rather than fixing anything. Two things keep
+that from turning a blip into a dead AC, both learned on 2026-09-25, when the 5G router went
+down, three polls failed with "Temporary failure in name resolution", and the hub then never
+refreshed the rotated key again — hours after the internet returned — until the container was
+restarted by hand:
+
+* **An outage does not count.** A failure with no answer from the cloud (DNS, connect,
+  timeout) is transient: it is not logged every poll and does not spend the budget. A machine
+  that cannot reach the internet has learned nothing about its password.
+* **Giving up is not permanent.** After giving up it still tries once an hour, so a password
+  fixed in the meantime heals on its own.
+
 Set the account in `stack/.env` to enable it:
 
 ```ini

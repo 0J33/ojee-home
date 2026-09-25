@@ -18,6 +18,10 @@ COPY vendor/haismart_extractor /app/haismart_extractor
 COPY app /app/app
 COPY ui /app/ui
 COPY public /app/public
+# The tests ship too: the container has the exact interpreter and deps the hub
+# runs on, so `docker compose exec home python tests/test_keyfetch.py` is the
+# honest place to run them after a deploy.
+COPY tests /app/tests
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \

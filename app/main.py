@@ -110,6 +110,16 @@ async def summary() -> dict[str, Any]:
         "headline": headline,
         "facts": facts[:4],
         "alerts": alerts,
+        # What the console's own object needs to draw THIS house: whether the
+        # unit is running and in which mode, the two temperatures, and whether
+        # anyone is home. Without it the console can only colour a shape.
+        "model": {
+            "power": bool(lead and lead["state"].get("power")),
+            "mode": (lead or {}).get("state", {}).get("mode"),
+            "indoor": (lead or {}).get("state", {}).get("indoor_temperature"),
+            "target": (lead or {}).get("state", {}).get("target_temperature"),
+            "home": bool(presence.get("home") or presence.get("zone_name")),
+        },
     }
 
 

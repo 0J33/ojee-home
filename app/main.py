@@ -58,6 +58,61 @@ async def health() -> dict[str, Any]:
     }
 
 
+@app.get("/api/summary")
+async def summary() -> dict[str, Any]:
+    """One object describing this hub from outside, for the console's launcher.
+
+    The card has room for a line and four facts, so this answers the two
+    questions someone glancing at the launcher actually has: is the house warm,
+    and is anything broken. A device that cannot be reached — a rotated key, an
+    AC that is off at the wall — becomes an alert, because the whole point of
+    the launcher is to notice that without opening the module.
+    """
+    snap = HUB.snapshot()
+    devices = snap["devices"]
+    online = [d for d in devices if d["available"]]
+    broken = [d for d in devices if not d["available"] and not d.get("simulated")]
+    presence = snap.get("presence") or {}
+
+    # The one with a temperature is the one worth leading with.
+    lead = next((d for d in online if d["state"].get("indoor_temperature") is not None), None)
+    facts: list[dict[str, Any]] = []
+    if lead:
+        state = lead["state"]
+        facts.append({"k": lead.get("room") or lead["name"], "v": f"{state['indoor_temperature']}°C"})
+        facts.append({"k": "Set to", "v": (f"{state.get('target_temperature')}°C "
+                                           f"{state.get('mode') or ''}".strip()
+                                           if state.get("power") else "standby")})
+        if state.get("outdoor_temperature") is not None:
+            facts.append({"k": "Outside", "v": f"{state['outdoor_temperature']}°C"})
+    facts.append({"k": "Devices", "v": f"{len(online)}/{len(devices)} online"})
+    if presence.get("zone_name"):
+        facts.append({"k": "Phone", "v": presence["zone_name"]})
+
+    alerts = [{
+        "severity": "err",
+        "text": f"{d['name']}: {d.get('status_detail') or d.get('status') or 'unavailable'}",
+        "view": "devices",
+    } for d in broken]
+
+    if broken:
+        headline = f"{broken[0]['name']} needs attention"
+    elif lead and lead["state"].get("power"):
+        headline = (f"{lead['name']} {lead['state'].get('mode') or 'on'} "
+                    f"to {lead['state'].get('target_temperature')}°C")
+    elif devices:
+        headline = f"{len(online)} of {len(devices)} device{'s' if len(devices) != 1 else ''} online"
+    else:
+        headline = "no devices configured"
+
+    return {
+        "status": "err" if broken else "ok",
+        "headline": headline,
+        "facts": facts[:4],
+        "alerts": alerts,
+    }
+
+
 # ---- devices -------------------------------------------------------------
 @app.get("/api/devices")
 async def list_devices() -> list[dict[str, Any]]:
@@ -288,7 +343,7 @@ async def module_manifest() -> dict[str, Any]:
         ],
         "ui": "/ui/index.js",
         "health": "/api/health",
-        "capabilities": ["sse", "commands"],
+        "capabilities": ["sse", "commands", "summary"],
     }
 
 

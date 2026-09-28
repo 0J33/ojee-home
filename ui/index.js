@@ -301,8 +301,8 @@ function statusBadge(device) {
   return `<span class="badge"><i class="dot ${cls}"></i>${esc(text)}</span>`;
 }
 
-/* On/off sits first — above the dial, and at the top of the overview — so it is
-   never a scroll away on a phone or a short laptop screen. */
+/* On/off sits under the dial in the panel, and again in the strip at the top
+   of the overview so it is never a scroll away. */
 function powerButton(device, extra = '') {
   const on = !!device.state.power;
   return `<button class="btn powerbtn ${on ? '' : 'btn--ghost'} ${extra}" data-toggle="power"
@@ -358,8 +358,8 @@ function devicePanel(device) {
 
       <div class="devgrid">
         <div class="climate">
-          ${powerButton(device)}
           ${dial(device)}
+          ${powerButton(device)}
         </div>
         <div class="controls">
           <div class="ctlpair">

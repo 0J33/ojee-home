@@ -301,6 +301,15 @@ function statusBadge(device) {
   return `<span class="badge"><i class="dot ${cls}"></i>${esc(text)}</span>`;
 }
 
+/* On/off sits first — above the dial, and at the top of the overview — so it is
+   never a scroll away on a phone or a short laptop screen. */
+function powerButton(device, extra = '') {
+  const on = !!device.state.power;
+  return `<button class="btn powerbtn ${on ? '' : 'btn--ghost'} ${extra}" data-toggle="power"
+            ${device.available ? '' : 'disabled'} aria-pressed="${on}">
+      ${icon('i-power', 'ic ic--lg')} ${on ? 'On' : 'Off'}</button>`;
+}
+
 function devicePanel(device) {
   const st = device.state;
   const t = device.transport || {};
@@ -349,10 +358,8 @@ function devicePanel(device) {
 
       <div class="devgrid">
         <div class="climate">
+          ${powerButton(device)}
           ${dial(device)}
-          <button class="btn powerbtn ${st.power ? '' : 'btn--ghost'}" data-toggle="power"
-                  ${device.available ? '' : 'disabled'} aria-pressed="${!!st.power}">
-            ${icon('i-power', 'ic ic--lg')} ${st.power ? 'On' : 'Off'}</button>
         </div>
         <div class="controls">
           <div class="ctlpair">
@@ -394,6 +401,16 @@ function viewOverview() {
   <div class="stack-lg">
     <div class="section-head"><span class="idx">A / OVERVIEW</span><h1 class="h2">Home</h1>
       <span class="spacer"></span><span class="meta">${esc(s.hub.now)}</span></div>
+
+    ${s.devices.length ? `<div class="quickac">
+      ${s.devices.map((d) => `<div class="quickac-row" data-device="${esc(d.id)}">
+        <span class="quickac-name"><b>${esc(d.name)}</b><span class="meta">${d.state.power
+          ? `${esc(labelFor(d, 'mode', d.state.mode))} · ${num(d.state.target_temperature, 0)}°C`
+          : 'off'} · ${num(d.state.indoor_temperature)}°C inside</span></span>
+        ${statusBadge(d)}
+        ${powerButton(d, 'powerbtn--quick')}
+      </div>`).join('')}
+    </div>` : ''}
 
     <div class="tiles">
       <div class="panel corners"><i class="c"></i><div class="stat"><span class="label">Indoor</span>

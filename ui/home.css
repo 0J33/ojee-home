@@ -145,6 +145,19 @@
 /* the one primary action on the panel — full width, unmistakable */
 .hm .powerbtn { width: 100%; justify-content: center; min-height: 52px; letter-spacing: 3px; }
 
+/* the on/off strip at the top of the overview, one row per unit */
+.hm .quickac { display: flex; flex-direction: column; gap: var(--s-2); }
+.hm .quickac-row {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: var(--s-3); border: 1px solid var(--line); background: var(--panel);
+}
+.hm .quickac-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.hm .quickac-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm .powerbtn.powerbtn--quick { width: auto; min-width: 8.5rem; min-height: 48px; }
+@media (max-width: 560px) {
+  .hm .powerbtn.powerbtn--quick { flex: 1 1 100%; }
+}
+
 /* ---------- climate dial ---------- */
 .hm .dialwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
 .hm .dial { position: relative; width: 100%; max-width: 260px; aspect-ratio: 1; }

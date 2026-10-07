@@ -165,7 +165,6 @@
 .hm .dial .d-track { fill: none; stroke: var(--line-2); stroke-width: 10; }
 .hm .dial .d-fill {
   fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: butt;
-  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.45));
   transition: stroke-dasharray 0.45s ease, stroke 0.2s;
 }
 .hm .dial .d-tick { stroke: var(--line); stroke-width: 1; }
@@ -219,7 +218,7 @@
   letter-spacing: 1.2px; text-transform: uppercase;
   color: var(--ink-2); cursor: pointer; transition: var(--t);
 }
-.hm .segctl button:hover:not(:disabled) { border-color: #333; color: var(--ink); background: var(--accent-03); }
+.hm .segctl button:hover:not(:disabled) { border-color: var(--line-strong); color: var(--ink); background: var(--accent-03); }
 .hm .segctl button[aria-pressed="true"] {
   border-color: var(--accent); color: var(--accent); background: var(--accent-08);
 }
@@ -265,7 +264,7 @@
   color: var(--ink-2);
   cursor: pointer; transition: var(--t);
 }
-.hm .togrow:hover { border-color: #333; background: var(--accent-03); }
+.hm .togrow:hover { border-color: var(--line-strong); background: var(--accent-03); }
 .hm .togrow .tlabel {
   flex: 1; min-width: 0;
   font-size: 0.62rem; font-weight: 900; letter-spacing: 1.2px;
@@ -281,7 +280,6 @@
 .hm .togrow[data-on="1"] .toggle .track::before {
   transform: translateX(22px);
   background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
 }
 
 /* ---------- scene / automation cards ---------- */
@@ -321,7 +319,7 @@
 .hm [data-automation] { cursor: pointer; flex: none; }
 .hm [data-automation][data-on="1"] .track { border-color: var(--accent); background: var(--accent-08); }
 .hm [data-automation][data-on="1"] .track::before {
-  transform: translateX(22px); background: var(--accent); box-shadow: 0 0 8px var(--accent);
+  transform: translateX(22px); background: var(--accent);
 }
 
 /* ---------- editor ---------- */

@@ -113,6 +113,9 @@ async def summary() -> dict[str, Any]:
         # What the console's own object needs to draw THIS house: whether the
         # unit is running and in which mode, the two temperatures, and whether
         # anyone is home. Without it the console can only colour a shape.
+        "quick": {
+            "ac-power": {"on": bool(lead and lead["state"].get("power"))},
+        },
         "model": {
             "power": bool(lead and lead["state"].get("power")),
             "mode": (lead or {}).get("state", {}).get("mode"),
@@ -162,6 +165,19 @@ async def rename_device(device_id: str, body: dict[str, Any] = Body(...)) -> dic
         return HUB.rename(device_id, name, room)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/quick/ac-power")
+async def quick_ac_power() -> dict[str, Any]:
+    """Toggle the lead AC's power — the one button the home tile carries."""
+    snap = HUB.snapshot()
+    lead = next((d for d in snap["devices"]
+                 if d["available"] and d["state"].get("indoor_temperature") is not None), None)
+    if lead is None:
+        raise HTTPException(404, "no AC answering")
+    target = not bool(lead["state"].get("power"))
+    await HUB.command(lead["id"], {"power": target})
+    return {"ok": True, "on": target}
 
 
 @app.post("/api/devices/{device_id}/refresh")
@@ -354,6 +370,12 @@ async def module_manifest() -> dict[str, Any]:
         "ui": "/ui/index.js",
         "health": "/api/health",
         "capabilities": ["sse", "commands", "summary"],
+        # One press on the console's home tile: the lead AC's power. The
+        # state it reports rides on /api/summary's `quick`, so the button
+        # shows what the house is actually doing.
+        "quickActions": [
+            {"id": "ac-power", "label": "AC power", "icon": "i-ac"},
+        ],
     }
 
 

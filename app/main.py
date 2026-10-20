@@ -360,6 +360,9 @@ async def module_manifest() -> dict[str, Any]:
         "id": "home",
         "name": "Home",
         "version": app.version,
+        # The AC leads this module; its glyph identifies the module and the
+        # quick-action group on the console's home tile.
+        "icon": "i-ac",
         "views": [
             {"id": "overview", "label": "Overview", "icon": "i-grid"},
             {"id": "devices", "label": "Devices", "icon": "i-ac"},
@@ -374,7 +377,7 @@ async def module_manifest() -> dict[str, Any]:
         # state it reports rides on /api/summary's `quick`, so the button
         # shows what the house is actually doing.
         "quickActions": [
-            {"id": "ac-power", "label": "AC power", "icon": "i-ac"},
+            {"id": "ac-power", "label": "AC power", "icon": "i-power"},
         ],
     }
 

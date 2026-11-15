@@ -296,6 +296,8 @@ function statusBadge(device) {
     unconfigured: ['dot--warn', 'needs key'],
     unreachable: ['dot--err', 'unreachable'],
     error: ['dot--err', 'error'],
+    parked: ['', 'off at the wall'],
+    unknown: ['', 'checking…'],
   };
   const [cls, text] = map[device.status] || ['', device.status];
   return `<span class="badge"><i class="dot ${cls}"></i>${esc(text)}</span>`;
@@ -342,8 +344,15 @@ function devicePanel(device) {
         unit and no settings are lost.</span>
       </div>` : ''}
 
-      ${(device.status !== 'ok' && device.status !== 'key_rotated') ? `<div class="alert alert--err notice">
-        <b>${esc(device.status)}</b><span>${esc(device.status_detail || device.last_error || '')}</span>
+      ${device.status === 'parked' ? `<div class="alert notice">
+        <b>off at the wall</b><span>Switched off at its fuse or plug${device.parked_at ? ` since ${new Date(device.parked_at * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}, so not answering is expected and nothing is flagged.
+        The hub looks for it every ten minutes and picks it up by itself when the power is back.</span>
+        <button class="btn btn--ghost" data-park="0" data-id="${esc(device.id)}">It's back on</button>
+      </div>` : ''}
+
+      ${(device.status !== 'ok' && device.status !== 'key_rotated' && device.status !== 'parked') ? `<div class="alert ${device.status === 'unknown' ? '' : 'alert--err'} notice">
+        <b>${device.status === 'unknown' ? 'checking' : esc(device.status)}</b><span>${esc(device.status === 'unknown' ? 'The hub has not heard from it since it started; a unit that does not answer takes a minute or two to be sure of.' : device.status_detail || device.last_error || '')}</span>
+        <button class="btn btn--ghost" data-park="1" data-id="${esc(device.id)}">It's switched off at the wall</button>
       </div>` : ''}
 
       ${device.stale ? `<div class="alert notice">
@@ -1027,6 +1036,20 @@ const onClick = async (ev) => {
     state.editor = { kind: 'device', isNew: false,
                      draft: { id: dev.id, name: dev.name, room: dev.room } };
     renderEditor();
+    return;
+  }
+
+  const park = t.closest('[data-park]');
+  if (park) {
+    const on = park.dataset.park === '1';
+    try {
+      const updated = await api(`/devices/${park.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ parked: on }) });
+      const i = state.snapshot.devices.findIndex((x) => x.id === updated.id);
+      if (i >= 0) state.snapshot.devices[i] = updated;
+      render();
+      if (!on) await api(`/devices/${park.dataset.id}/refresh`, { method: 'POST' }).then(refreshSnapshot).catch(() => {});
+      toast('ok', on ? 'Marked as off at the wall' : 'Looking for it again', on ? 'No more alerts; it comes back by itself when it answers.' : '');
+    } catch (err) { toast('err', 'Did not change', err.message); }
     return;
   }
 

@@ -23,6 +23,10 @@ from .presence import Presence
 from .store import Store
 
 
+#: How often a unit switched off at the wall is looked for (it unparks itself on an answer).
+PARKED_POLL_SECONDS = 600
+
+
 class EventBus:
     """Fan-out for Server-Sent Events. Slow consumers get dropped rather than allowed to
     back-pressure the poll loop."""
@@ -53,6 +57,7 @@ class Hub:
         self.bus = EventBus()
         self.devices: dict[str, Driver] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._parked_tried: dict[str, float] = {}
         self._task: asyncio.Task | None = None
         self._settle_until: float = 0.0
         self.started_at = time.time()
@@ -136,6 +141,8 @@ class Hub:
                 driver.name = entry["name"]
             if entry.get("room") is not None:
                 driver.room = entry["room"]
+            driver.parked = bool(entry.get("parked"))
+            driver.parked_at = entry.get("parked_at")
 
     def rename(self, device_id: str, name: str | None, room: str | None) -> dict[str, Any]:
         if device_id not in self.devices:
@@ -156,6 +163,27 @@ class Hub:
         self.store.log("rename", f"Renamed to '{device.name}'"
                                  + (f" ({device.room})" if device.room else ""),
                        "", SETTINGS.activity_limit)
+        payload = device.describe()
+        self.bus.publish("device", payload)
+        return payload
+
+    def park(self, device_id: str, on: bool) -> dict[str, Any]:
+        """Switched off at the wall (on), or back (off). While parked the unit is still looked
+        for now and then (PARKED_POLL_SECONDS), and the first answer unparks it by itself: the
+        fuse going back on in spring needs nothing done here."""
+        if device_id not in self.devices:
+            raise KeyError(device_id)
+        meta = self.store.get("device_meta") or {}
+        entry = dict(meta.get(device_id) or {})
+        entry["parked"] = bool(on)
+        entry["parked_at"] = time.time() if on else None
+        meta[device_id] = entry
+        self.store.set("device_meta", meta)
+        self._apply_device_meta()
+        device = self.devices[device_id]
+        self.store.log("park", f"{device.name}: switched off at the wall" if on else f"{device.name}: back on",
+                       "", SETTINGS.activity_limit)
+        self.bus.publish("activity", self.store.get("activity")[:1])
         payload = device.describe()
         self.bus.publish("device", payload)
         return payload
@@ -186,7 +214,14 @@ class Hub:
 
     # ---- devices -------------------------------------------------------
     async def refresh_all(self) -> None:
+        now = time.time()
         for device_id in list(self.devices):
+            device = self.devices[device_id]
+            # Off at the wall: looked for now and then, not every poll.
+            if device.parked and now - self._parked_tried.get(device_id, 0) < PARKED_POLL_SECONDS:
+                continue
+            if device.parked:
+                self._parked_tried[device_id] = now
             await self.refresh(device_id)
 
     async def refresh(self, device_id: str) -> None:
@@ -198,6 +233,10 @@ class Hub:
             # so an app-triggered rotation heals within one poll instead of waiting for a human.
             if device.status == "key_rotated" and await self._heal_key(device_id):
                 await device.refresh()
+        # It answered: the power is back, so it is not off at the wall any more.
+        if device.parked and device.available:
+            self.park(device_id, False)
+            return
         if previous != (device.available, dict(device.state)):
             self.bus.publish("device", device.describe())
 

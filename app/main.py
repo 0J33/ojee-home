@@ -17,7 +17,10 @@ from .hub import HUB
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await HUB.refresh_all()
+    # Serving starts at once: the first poll runs in the background loop (HUB.start polls first
+    # thing). Waiting on it here kept the whole hub unreachable whenever a device was not
+    # answering, an AC switched off at the wall for the winter above all: its read times out and
+    # then the subnet is scanned for it before giving up.
     await HUB.start()
     yield
     await HUB.stop()
@@ -71,7 +74,9 @@ async def summary() -> dict[str, Any]:
     snap = HUB.snapshot()
     devices = snap["devices"]
     online = [d for d in devices if d["available"]]
-    broken = [d for d in devices if not d["available"] and not d.get("simulated")]
+    # Switched off at the wall (a fuse off for the winter) is not broken: no alert for it.
+    broken = [d for d in devices if not d["available"] and not d.get("simulated") and not d.get("parked") and d.get("status") != "unknown"]
+    parked = [d for d in devices if d.get("parked") and not d["available"]]
     presence = snap.get("presence") or {}
 
     # The one with a temperature is the one worth leading with.
@@ -85,7 +90,10 @@ async def summary() -> dict[str, Any]:
                                            if state.get("power") else "standby")})
         if state.get("outdoor_temperature") is not None:
             facts.append({"k": "Outside", "v": f"{state['outdoor_temperature']}°C"})
-    facts.append({"k": "Devices", "v": f"{len(online)}/{len(devices)} online"})
+    for d in parked[:2]:
+        facts.append({"k": d.get("room") or d["name"], "v": "off at the wall"})
+    facts.append({"k": "Devices", "v": f"{len(online)}/{len(devices) - len(parked)} online"
+                  + (f", {len(parked)} off at the wall" if parked else "")})
     if presence.get("zone_name"):
         facts.append({"k": "Phone", "v": presence["zone_name"]})
 
@@ -100,6 +108,8 @@ async def summary() -> dict[str, Any]:
     elif lead and lead["state"].get("power"):
         headline = (f"{lead['name']} {lead['state'].get('mode') or 'on'} "
                     f"to {lead['state'].get('target_temperature')}°C")
+    elif parked and not online:
+        headline = f"{parked[0]['name']} switched off at the wall"
     elif devices:
         headline = f"{len(online)} of {len(devices)} device{'s' if len(devices) != 1 else ''} online"
     else:
@@ -158,11 +168,14 @@ async def send_command(device_id: str, command: dict[str, Any] = Body(...)) -> d
 async def rename_device(device_id: str, body: dict[str, Any] = Body(...)) -> dict[str, Any]:
     if device_id not in HUB.devices:
         raise HTTPException(404, f"no device {device_id!r}")
-    name, room = body.get("name"), body.get("room")
-    if name is None and room is None:
-        raise HTTPException(400, "provide 'name' and/or 'room'")
+    name, room, parked = body.get("name"), body.get("room"), body.get("parked")
+    if name is None and room is None and parked is None:
+        raise HTTPException(400, "provide 'name', 'room' and/or 'parked'")
     try:
-        return HUB.rename(device_id, name, room)
+        out = HUB.rename(device_id, name, room) if (name is not None or room is not None) else None
+        if parked is not None:
+            out = HUB.park(device_id, bool(parked))
+        return out
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

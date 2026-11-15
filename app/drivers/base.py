@@ -51,7 +51,12 @@ class Driver:
     def __init__(self) -> None:
         self.state: dict[str, Any] = {}
         self.available: bool = False
-        self.status: str = "unknown"       # ok | unconfigured | unreachable | error
+        self.status: str = "unknown"       # ok | unconfigured | unreachable | error | parked
+        #: Switched off at the wall (a fuse turned off for the season): not answering is
+        #: expected, so it is not a fault. Set by the person (hub.park); cleared by itself
+        #: the first time the unit answers again.
+        self.parked: bool = False
+        self.parked_at: float | None = None
         self.status_detail: str = ""
         self.last_seen: float | None = None
         self.last_error: str = ""
@@ -68,8 +73,10 @@ class Driver:
             "room": self.room,
             "simulated": self.simulated,
             "available": self.available,
-            "status": self.status,
-            "status_detail": self.status_detail,
+            "status": "parked" if self.parked and not self.available else self.status,
+            "status_detail": "switched off at the wall" if self.parked and not self.available else self.status_detail,
+            "parked": self.parked,
+            "parked_at": self.parked_at,
             "last_seen": self.last_seen,
             # The readings below are never live while the device is unavailable: either the
             # last good ones, or — if there has not been a good read since start — the

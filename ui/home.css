@@ -120,6 +120,11 @@
 .homem .ho-sheet-body{flex:1;min-height:0;display:flex;flex-direction:column}
 .homem .ho-sh{flex:1;min-height:0;display:flex;flex-direction:column}
 .homem .ho-sh.bare .ho-sh-list .ho-cap:first-child{border-top:0}
+/* Inside the console's shared sheet, the sheet body is the scroller. An inner
+   overflow:auto box with overscroll-behavior:contain never overflows there, yet
+   still stops the wheel from chaining to the sheet: the Advanced sheet would not
+   scroll with a mouse wheel or trackpad. */
+.homem .ho-sh.bare .ho-sh-scroll{flex:none;overflow:visible;overscroll-behavior:auto}
 .homem .ho-sh-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (min-width:700px){
   .homem .ho-sheet{left:auto;top:0;width:min(480px,100%);max-height:none;border-radius:0;border-width:0 0 0 1px;transform:translateX(100%);transition:transform 300ms var(--ease-drawer)}

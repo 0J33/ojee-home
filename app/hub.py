@@ -29,6 +29,27 @@ from .store import Store
 PARKED_POLL_SECONDS = 600
 
 
+_WORDS = {"target_temperature": "setpoint", "swing_vertical": "vertical swing",
+          "swing_horizontal": "horizontal swing", "self_clean": "self-clean"}
+
+
+def describe_command(command: dict[str, Any]) -> str:
+    """A command as a person would say it: "on · cool · setpoint 24°", not "power=True"."""
+    parts = []
+    for k, v in command.items():
+        if k == "power":
+            parts.append("on" if v else "off")
+        elif k == "mode":
+            parts.append(str(v))
+        elif k == "target_temperature":
+            parts.append(f"setpoint {v}°")
+        elif isinstance(v, bool):
+            parts.append(f"{_WORDS.get(k, k.replace('_', ' '))} {'on' if v else 'off'}")
+        else:
+            parts.append(f"{_WORDS.get(k, k.replace('_', ' '))} {v}")
+    return " · ".join(parts) or "nothing"
+
+
 class EventBus:
     """Fan-out for Server-Sent Events. Slow consumers get dropped rather than allowed to
     back-pressure the poll loop."""
@@ -265,7 +286,7 @@ class Hub:
                     raise
                 await device.apply(command)
         self._settle_until = time.time() + SETTINGS.settle_seconds
-        summary = ", ".join(f"{k}={v}" for k, v in command.items())
+        summary = describe_command(command)
         self.store.log("command", f"{device.name}: {summary}", "", SETTINGS.activity_limit)
         payload = device.describe()
         self.bus.publish("device", payload)

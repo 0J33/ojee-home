@@ -140,14 +140,23 @@ async def summary() -> dict[str, Any]:
         {"label": "Outdoor coil", "value": _fmt(st.get("outdoor_temperature"), 0) or "—", "unit": "°C",
          **({"stale": True} if not live else {})},
         ({"label": "Humidity", "value": _fmt(hum, 0), "unit": "%"} if hum is not None else
-         {"label": "Phone", "value": presence.get("zone_name") or ("Away" if presence.get("last_fix") else "—"),
+         {"label": "Phone", "value": (presence.get("zone_name") if presence.get("zone_name") not in (None, "unknown")
+                    else "Away" if presence.get("last_fix") else "—"),
           "unit": ""}),
     ]
 
     spark = None
     if lead:
         rows = HUB.history.series(lead["id"], 6)
-        vals = [r.get("in") for r in rows]
+        # 72 five-minute buckets: a sparkline has ~120 px to draw in, and a missing
+        # bucket stays a gap (None) rather than being bridged.
+        t_end = time.time()
+        buckets: list[list[float]] = [[] for _ in range(72)]
+        for r in rows:
+            i = int((r["t"] - (t_end - 6 * 3600)) // 300)
+            if 0 <= i < 72 and r.get("in") is not None:
+                buckets[i].append(r["in"])
+        vals = [round(sum(b) / len(b), 2) if b else None for b in buckets]
         nums = [v for v in vals if v is not None]
         since = HUB.history.on_since(lead["id"])
         stat = ""
@@ -157,7 +166,7 @@ async def summary() -> dict[str, Any]:
                 stat = f"{nums[-1] - start:+.1f}° since on"
         elif nums:
             stat = f"{min(nums):.1f}–{max(nums):.1f}°"
-        spark = {"label": "Indoor °C · 6h", "values": vals[-120:], "stat": stat,
+        spark = {"label": "Indoor °C · 6h", "values": vals, "stat": stat,
                  "threshold": st.get("target_temperature") if on else None, "unit": "°C"}
 
     if alerts:
@@ -168,6 +177,8 @@ async def summary() -> dict[str, Any]:
         headline = f"{mode} to {_fmt(st.get('target_temperature'), 0)}° · {_fmt(st.get('indoor_temperature'))}° inside"
     elif lead and live:
         headline = f"AC off · {_fmt(st.get('indoor_temperature'))}° inside"
+    elif lead and lead.get("status") != "unknown":
+        headline = f"{lead['name']} retrying"
     elif devices:
         headline = "AC checking…"
     else:
@@ -439,12 +450,11 @@ async def module_manifest() -> dict[str, Any]:
         # The house: the module is the home, and the AC is one thing in it.
         # Its glyph names the module wherever the console lists modules.
         "icon": "i-house",
-        # Two views: the AC and its temperatures, and everything else (all controls, scenes,
-        # automations, activity) behind Details. The old ids (devices, scenes, automations,
-        # activity) still deep-link: the UI maps them onto these two.
+        # One page: the AC and its temperatures, and everything else (all controls, scenes,
+        # automations, activity) under Details on the same page. The old view ids (devices,
+        # scenes, automations, activity) still deep-link: the UI opens that Details tab.
         "views": [
             {"id": "overview", "label": "Home", "icon": "i-house"},
-            {"id": "details", "label": "Details", "icon": "i-sliders"},
         ],
         "ui": "/ui/index.js",
         "health": "/api/health",

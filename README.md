@@ -47,6 +47,8 @@ docker build -t ojee-home . && docker run -p 8110:8110 -v home_data:/data ojee-h
 |---|---|---|
 | `HUB_DEMO` | `0` | `1` forces the simulator even with a key set |
 | `HUB_POLL_SECONDS` | `45` | see below — this number is not arbitrary |
+| `HUB_DOWN_CHECKS` / `HUB_DOWN_SECONDS` | `3` / `180` | a device is called unavailable only after this many failed reads spanning this long |
+| `HUB_MIRROR_URL` | — | development only: show another hub's device, read-only (commands refused) |
 | `AC_HOST` / `AC_DEVICE_ID` / `AC_LOCAL_KEY` | — | the unit; blank key ⇒ simulator |
 | `AC_TEMP_MIN` / `AC_TEMP_MAX` | — | narrow the setpoint range to what the remote allows |
 | `HAIER_USERNAME` / `HAIER_PASSWORD` / `HAIER_REGION` | — | used *only* to re-fetch a rotated key |
@@ -56,6 +58,26 @@ Full device setup, the Wi-Fi bridging, key fetching and what this specific unit 
 supports: **[docs/haier-ac.md](docs/haier-ac.md)**.
 
 ---
+
+## The page
+
+One page, on ojee-ui v3: the air conditioner once (power, setpoint, mode, fan) beside
+indoor and outdoor-coil temperatures and their history; every other control, scenes,
+automations and the activity log under **Details**. The outdoor reading is the thermistor on
+the outdoor unit's coil, not outside air, and is labelled so.
+
+**History** is one sample a minute per device in `/data/history.jsonl` (72 h, compacted on
+start), so a redeploy keeps the chart. `GET /api/history?hours=6|24|48`.
+
+**Unavailable means sustained.** One missed read (the phone app holding the AC's only
+session, a Wi-Fi hiccup) shows the last reading with a quiet *Retrying*; only `HUB_DOWN_CHECKS`
+failures spanning `HUB_DOWN_SECONDS` make the device `down`, which is what the page and the
+console call unavailable. Off at the wall is never an alert.
+
+**Console contract.** `/api/summary` carries `metrics` (AC, Indoor, Outdoor coil, Humidity or
+Phone), `spark` (indoor °C, 6 h, 5-minute buckets) and `alerts` with stable keys
+`home.ac-fault.<device>` (the unit reports an E-code) and `home.ac-unavailable.<device>`;
+the manifest lists both under `alertKinds`.
 
 ## Why polling, and why 45 seconds
 

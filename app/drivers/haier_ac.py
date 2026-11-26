@@ -223,14 +223,14 @@ def build_capabilities(spec: Spec) -> list[Capability]:
             needs_power=True, icon="fan",
         ),
         Capability(
-            "swing_vertical", "Swing Vert", "enum",
+            "swing_vertical", "Vertical swing", "enum",
             options=[{"value": t, "label": SWING_V_LABELS[t]} for t in SWING_V_ORDER],
             needs_power=True, icon="swing-v",
             hint="Fix parks the louvre where it is; 1-5 are fixed stops top to bottom; "
                  "Auto sweeps. All confirmed on this unit.",
         ),
         Capability(
-            "swing_horizontal", "Swing Horiz", "enum",
+            "swing_horizontal", "Horizontal swing", "enum",
             options=[{"value": t, "label": SWING_LABELS[t]} for t in SWING_H_ORDER],
             needs_power=True, icon="swing-h",
             hint="Fix parks the vane; 1-6 are fixed stops left to right; Auto sweeps.",

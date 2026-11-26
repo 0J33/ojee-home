@@ -192,7 +192,9 @@ async def summary() -> dict[str, Any]:
         "metrics": metrics,
         "spark": spark,
         "alerts": alerts,
-        "quick": {"ac-power": {"on": on}},
+        # Quick-action state for the console's overview: the AC's power, and each scene
+        # (label + when it last ran). Ids match the manifest's quickActions.
+        "quick": {"ac-power": {"on": on}, **_scene_quick()},
     }
 
 
@@ -254,7 +256,37 @@ async def rename_device(device_id: str, body: dict[str, Any] = Body(...)) -> dic
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/api/quick/ac-power")
+def _scene_last_runs() -> dict[str, float]:
+    """When each scene last ran, from the activity log ("Scene 'X' activated")."""
+    out: dict[str, float] = {}
+    for e in HUB.store.get("activity") or []:
+        msg = e.get("message") or ""
+        if e.get("kind") == "scene" and msg.startswith("Scene '"):
+            name = msg[len("Scene '"):].rsplit("'", 1)[0]
+            out.setdefault(name, e.get("ts"))
+    return out
+
+
+def _scene_quick() -> dict[str, Any]:
+    runs = _scene_last_runs()
+    return {f"scene-{sc['id']}": {"label": sc.get("name"), "lastRun": runs.get(sc.get("name"))}
+            for sc in (HUB.store.get("scenes") or [])}
+
+
+@app.post("/api/quick/{quick_id}")
+async def quick_action(quick_id: str) -> dict[str, Any]:
+    """Overview quick actions: `ac-power` toggles the lead AC, `scene-<id>` runs a scene."""
+    if quick_id == "ac-power":
+        return await quick_ac_power()
+    if quick_id.startswith("scene-"):
+        try:
+            out = await HUB.activate_scene(quick_id[len("scene-"):])
+        except KeyError as exc:
+            raise HTTPException(404, f"no scene {quick_id!r}") from exc
+        return {"ok": not out["errors"], **out}
+    raise HTTPException(404, f"no quick action {quick_id!r}")
+
+
 async def quick_ac_power() -> dict[str, Any]:
     """Toggle the lead AC's power — the one button the home tile carries."""
     snap = HUB.snapshot()
@@ -465,8 +497,11 @@ async def module_manifest() -> dict[str, Any]:
         # One press on the console's home tile: the lead AC's power. The
         # state it reports rides on /api/summary's `quick`, so the button
         # shows what the house is actually doing.
+        # The AC's power, then one per scene, so a scene is one tap from the overview.
         "quickActions": [
             {"id": "ac-power", "label": "AC power", "icon": "i-power"},
+            *[{"id": f"scene-{sc['id']}", "label": sc.get("name") or sc["id"], "icon": "i-scene"}
+              for sc in (HUB.store.get("scenes") or [])],
         ],
     }
 

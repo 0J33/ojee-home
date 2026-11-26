@@ -40,6 +40,19 @@ class SummaryContract(unittest.TestCase):
             kinds = {k["kind"] for k in m["alertKinds"]}
             self.assertEqual(kinds, {"home.ac-fault", "home.ac-unavailable"})
             self.assertNotIn("Outside", str(s) + str(m))
+
+            # Scenes are overview quick actions: declared, stateful, and runnable.
+            from app.main import quick_action
+            sc = h.store.get("scenes")[0]
+            qid = f"scene-{sc['id']}"
+            self.assertIn(qid, [q["id"] for q in m["quickActions"]])
+            self.assertIn("ac-power", [q["id"] for q in m["quickActions"]])
+            out = await quick_action(qid)
+            self.assertTrue(out["ok"])
+            s = await summary()
+            self.assertEqual(s["quick"][qid]["label"], sc["name"])
+            self.assertIsNotNone(s["quick"][qid]["lastRun"])
+            self.assertIn("on", s["quick"]["ac-power"])
         asyncio.run(run())
 
 

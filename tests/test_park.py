@@ -37,7 +37,8 @@ class Park(unittest.TestCase):
             d.fail_since -= 200          # three misses spanning more than three minutes
             s = await summary()
             self.assertEqual(s["status"], "warn")
-            self.assertEqual([a["key"] for a in s["alerts"]], [f"home.ac-unavailable.{did}"])
+            self.assertEqual([a["key"] for a in s["alerts"]], [did])
+            self.assertEqual(s["alerts"][0]["notify"], "home.ac-unavailable")
             h.park(did, True)
             s = await summary()
             self.assertEqual((s["status"], s["alerts"]), ("ok", []))

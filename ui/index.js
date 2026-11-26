@@ -334,7 +334,7 @@ function capControl(d, c, live, on) {
    a new capability shows up here with no change to this file. Then every reading,
    including state keys no capability names (fault code, who changed it last). */
 const STATE_LABELS = { error_code: 'Fault code', last_changed_by: 'Changed by', self_cleaning: 'Self-cleaning' };
-function advancedPanel(d) {
+function advancedPanel(d, { bare = false } = {}) {
   const live = d.available;
   const on = live && d.state.power;
   const caps = d.capabilities || [];
@@ -345,10 +345,10 @@ function advancedPanel(d) {
   const t = d.transport || {};
   const s = status(d);
   const fmtState = (k, v) => (k === 'error_code' ? (v ? `E${v}` : 'none') : v === true ? 'yes' : v === false ? 'no' : v ?? '—');
-  return `<div class="ho-sh" data-device="${esc(d.id)}">
-    <header class="ho-sh-head"><span class="sic">${ic('i-snow')}</span><div class="grow"><h2 id="ho-sheet-t">${esc(d.name)}</h2>
+  return `<div class="ho-sh${bare ? ' bare' : ''}" data-device="${esc(d.id)}">
+    ${bare ? '' : `<header class="ho-sh-head"><span class="sic">${ic('i-snow')}</span><div class="grow"><h2 id="ho-sheet-t">${esc(d.name)}</h2>
       <span class="st"><span class="dot" style="--c:${col(s.s)}"></span><span>${esc(s.text)}</span></span></div>
-      <button class="ib" data-sheet-close aria-label="Close">${ic('i-x')}</button></header>
+      <button class="ib" data-sheet-close aria-label="Close">${ic('i-x')}</button></header>`}
     <div class="ho-sh-scroll"><div class="ho-sh-list">
     ${controls.map((c) => (c.kind === 'action' && state.confirm === `${d.id}|${c.key}`
     ? `<div class="confirm"><p><b>${esc(c.label)}?</b> ${esc(c.hint || 'Runs to completion on the unit.')}</p><div class="acts"><button class="btn sm" data-cancel>Cancel</button><button class="btn sm pri" data-run="${esc(c.key)}">Start</button></div></div>`
@@ -541,9 +541,16 @@ function render() {
   const sub = lead ? [lead.room || null, lead.transport?.host ? 'local LAN' : null].filter(Boolean).join(' · ') : '';
   const tabs = { scenes: scenesTab, automations: automationsTab, places: placesTab, devices: devicesTab, activity: activityTab };
   const keep = root.querySelector('.ho-det-body')?.scrollTop;
-  root.innerHTML = `<div class="page homem">
-    <div class="ph"><div><h1>Home</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
-      <div class="acts">${state.connected === false ? tag('Reconnecting', 'warn') : ''}${s.hub?.demo ? tag('Demo') : ''}</div></div>
+  const acts = `${state.connected === false ? tag('Reconnecting', 'warn') : ''}${s.hub?.demo ? tag('Demo') : ''}`;
+  // Inside the redesigned console the shell draws the page and its header (title +
+  // headline); this module only fills its right-hand side. Standalone it draws both.
+  const shell = !!ctx.ui3;
+  if (shell) {
+    const a = ctx.header?.actions;
+    if (a && a.dataset.home !== acts) { a.innerHTML = acts; a.dataset.home = acts; }
+  }
+  root.innerHTML = `<div class="${shell ? '' : 'page '}homem">
+    ${shell ? '' : `<div class="ph"><div><h1>Home</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div><div class="acts">${acts}</div></div>`}
     ${s.devices.length ? s.devices.map(acPanel).join('') : `<div class="panel"><div class="empty">${ic('i-ac')}<b>No devices</b><span>Set AC_HOST, AC_DEVICE_ID and AC_LOCAL_KEY.</span></div></div>`}
     <div class="ho-two">${sceneShortcuts()}${automationSummary()}</div>
     <section class="sec ho-details" id="ho-details">
@@ -585,7 +592,19 @@ function sheetHost() {
   return h;
 }
 
+let shared = null;          // the console's sheet ({ el, body, close, done }) when it offers one
+
 function openSheet(id, opener) {
+  if (state.sheet) closeSheet();             // one sheet at a time
+  if (ctx.sheet) {
+    const d = deviceById(id);
+    state.sheet = id; state.confirm = null;
+    shared = ctx.sheet({ title: d?.name || 'Air conditioner', sub: d ? status(d).text : '', width: 480,
+      flush: true, body: '<div id="ho-sheet-shared" class="homem"></div>' });
+    shared.done?.then(() => { if (shared) { shared = null; state.sheet = null; state.confirm = null; } });
+    renderSheet();
+    return;
+  }
   sheetOpener = opener || null;
   state.sheet = id;
   state.confirm = null;
@@ -599,6 +618,7 @@ function openSheet(id, opener) {
 }
 
 function closeSheet() {
+  if (shared) { const s0 = shared; shared = null; state.sheet = null; state.confirm = null; s0.close(); return; }
   const h = document.getElementById('ho-sheet');
   state.sheet = null;
   state.confirm = null;
@@ -615,6 +635,18 @@ function closeSheet() {
 function renderSheet() {
   if (!state.sheet) return;
   const d = deviceById(state.sheet);
+  if (shared) {
+    const box = document.getElementById('ho-sheet-shared');
+    if (!d || !box) return;
+    const sc = box.closest('.sheet-b');
+    const top = sc?.scrollTop || 0;
+    box.innerHTML = advancedPanel(d, { bare: true });
+    if (sc) sc.scrollTop = top;
+    const sub = shared.el?.querySelector('.sheet-h .sub');
+    if (sub) sub.textContent = status(d).text;
+    ui3?.placeSegs(box);
+    return;
+  }
   const h = document.getElementById('ho-sheet');
   if (!d || !h) return;
   const body = h.querySelector('.ho-sheet-body');
@@ -860,7 +892,7 @@ const onClick = async (ev) => {
     }
     return;
   }
-  const inSheet = t.closest('#ho-sheet');
+  const inSheet = t.closest('#ho-sheet, #ho-sheet-shared');
   if (inSheet && t.closest('[data-sheet-close]')) { closeSheet(); return; }
   if (!root.contains(t) && !inSheet) return;
 
@@ -974,7 +1006,7 @@ const onClick = async (ev) => {
 };
 
 const onKeydown = (ev) => {
-  if (state.sheet && !state.editor) {
+  if (state.sheet && !state.editor && !shared) {
     if (ev.key === 'Escape') { closeSheet(); return; }
     if (ev.key === 'Tab') {
       const f = [...document.querySelectorAll('#ho-sheet .ho-sheet button:not(:disabled)')];
@@ -1160,6 +1192,7 @@ export default {
     state.pendingSet = {};
     stream?.stop(); stream = null;
     state.editor = null; document.getElementById('ho-modal')?.remove();
+    if (shared) { shared.close(); shared = null; }
     state.sheet = null; document.getElementById('ho-sheet')?.remove();
     state.snapshot = null; state.history = {};
     root = null; ctx = null;

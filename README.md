@@ -80,9 +80,10 @@ failures spanning `HUB_DOWN_SECONDS` make the device `down`, which is what the p
 console call unavailable. Off at the wall is never an alert.
 
 **Console contract.** `/api/summary` carries `metrics` (AC, Indoor, Outdoor coil, Humidity or
-Phone), `spark` (indoor °C, 6 h, 5-minute buckets) and `alerts` with stable keys
-`home.ac-fault.<device>` (the unit reports an E-code) and `home.ac-unavailable.<device>`;
-the manifest lists both under `alertKinds`.
+Phone), `spark` (indoor °C, 6 h, 5-minute buckets) and `alerts` keyed by subject (the device id) with `notify` naming the kind —
+`home.ac-fault` (the unit reports an E-code) and `home.ac-unavailable`; the manifest lists both
+under `notifications` (the console's shape, with the "not answering for N min" param applied
+from `POST /api/notify/prefs`) and `alertKinds` (older alias).
 
 ## Why polling, and why 45 seconds
 

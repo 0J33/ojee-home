@@ -30,7 +30,8 @@ class SummaryContract(unittest.TestCase):
             d.state["error_code"] = 7
             s = await summary()
             self.assertEqual([(a["key"], a["kind"], a["severity"]) for a in s["alerts"]],
-                             [(f"home.ac-fault.{did}", "home.ac-fault", "err")])
+                             [(did, "home.ac-fault", "err")])
+            self.assertEqual(s["alerts"][0]["notify"], "home.ac-fault")
             d.state["error_code"] = 12           # a different number is the same item
             s2 = await summary()
             self.assertEqual(s2["alerts"][0]["key"], s["alerts"][0]["key"])
@@ -39,6 +40,17 @@ class SummaryContract(unittest.TestCase):
             m = await module_manifest()
             kinds = {k["kind"] for k in m["alertKinds"]}
             self.assertEqual(kinds, {"home.ac-fault", "home.ac-unavailable"})
+            self.assertEqual({n["id"] for n in m["notifications"]}, kinds)
+            for n in m["notifications"]:
+                self.assertEqual(n["source"], "alerts")
+                self.assertIn(n["severity"], ("info", "warn", "critical"))
+                self.assertIn(n["channel"], ("toast", "inbox", "off"))
+            self.assertEqual(s["spark"]["points"], s["spark"]["values"])
+            self.assertIn("status", s["metrics"][0])
+            from app.main import notify_prefs
+            from app.drivers.base import Driver
+            await notify_prefs({"types": {"home.ac-unavailable": {"params": {"minutes": 10}}}})
+            self.assertEqual(Driver.DOWN_SECONDS, 600.0)
             self.assertNotIn("Outside", str(s) + str(m))
 
             # Scenes are overview quick actions: declared, stateful, and runnable.

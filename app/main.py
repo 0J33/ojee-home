@@ -71,6 +71,41 @@ ALERT_KINDS: list[dict[str, Any]] = [
      "threshold": {"key": "minutes", "label": "Not answering for", "unit": "min", "default": 3}},
 ]
 
+# The same kinds in the console's documented shape (README "Notifications"): every kind shows
+# in Settings → Notifications; the shell holds/clears summary alerts by `hold` / `clearMin`
+# and POSTs the person's params back to /api/notify/prefs.
+NOTIFICATIONS: list[dict[str, Any]] = [
+    {"id": "home.ac-fault", "label": "AC reports a fault code",
+     "description": "The unit itself reports an error code (E-code).",
+     "severity": "critical", "blocking": False, "channel": "inbox", "discord": False,
+     "hold": 2, "clearMin": 5, "params": [], "view": "overview", "source": "alerts"},
+    {"id": "home.ac-unavailable", "label": "AC not answering",
+     "description": "No good read for several polls in a row. Off at the wall never raises it.",
+     "severity": "warn", "blocking": False, "channel": "inbox", "discord": False,
+     "hold": 2, "clearMin": 5,
+     "params": [{"key": "minutes", "label": "Not answering for", "type": "number", "unit": "min",
+                 "default": 3, "min": 1, "max": 120}],
+     "view": "overview", "source": "alerts"},
+]
+
+
+@app.post("/api/notify/prefs")
+async def notify_prefs(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    """The console's effective settings per kind; this module applies the thresholds."""
+    types = body.get("types") if isinstance(body, dict) else None
+    if not isinstance(types, dict):
+        raise HTTPException(400, "types is required")
+    params = ((types.get("home.ac-unavailable") or {}).get("params") or {})
+    minutes = params.get("minutes")
+    try:
+        if minutes is not None:
+            from .drivers.base import Driver
+            Driver.DOWN_SECONDS = max(60.0, min(7200.0, float(minutes) * 60))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "minutes must be a number") from None
+    return {"ok": True}
+
+
 _MODE_LABEL = {"cool": "Cool", "heat": "Heat", "dry": "Dry", "fan": "Fan", "fan_only": "Fan", "auto": "Auto"}
 
 
@@ -91,7 +126,7 @@ def _alerts(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for d in devices:
         code = (d.get("state") or {}).get("error_code") or 0
         if d["available"] and code:
-            out.append({"key": f"home.ac-fault.{d['id']}", "kind": "home.ac-fault",
+            out.append({"key": d["id"], "kind": "home.ac-fault",
                         "severity": "err", "view": "overview",
                         "text": f"{d['name']} reports fault E{code}",
                         "detail": "Error code from the unit itself; see the manual or the Haier app.",
@@ -99,7 +134,7 @@ def _alerts(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "notify": "home.ac-fault"})
         if d.get("down") and not d.get("parked"):
             mins = max(1, round((time.time() - (d.get("fail_since") or time.time())) / 60))
-            out.append({"key": f"home.ac-unavailable.{d['id']}", "kind": "home.ac-unavailable",
+            out.append({"key": d["id"], "kind": "home.ac-unavailable",
                         "severity": "warn", "view": "overview",
                         "text": f"{d['name']} not answering for {mins} min",
                         "detail": d.get("status_detail") or d.get("last_error") or "",
@@ -134,7 +169,8 @@ async def summary() -> dict[str, Any]:
     hum = st.get("humidity", st.get("indoor_humidity"))
     metrics = [
         {"label": "AC", "value": ac_value, "unit": "",
-         "state": "warn" if down else ("ok" if on else None)},
+         "state": "warn" if down else ("ok" if on else None),
+         "status": "warn" if down else ("ok" if on else None)},
         {"label": "Indoor", "value": _fmt(st.get("indoor_temperature")) or "—", "unit": "°C",
          **({"stale": True} if not live else {})},
         {"label": "Outdoor coil", "value": _fmt(st.get("outdoor_temperature"), 0) or "—", "unit": "°C",
@@ -166,8 +202,10 @@ async def summary() -> dict[str, Any]:
                 stat = f"{nums[-1] - start:+.1f}° since on"
         elif nums:
             stat = f"{min(nums):.1f}–{max(nums):.1f}°"
-        spark = {"label": "Indoor °C · 6h", "values": vals, "stat": stat,
-                 "threshold": st.get("target_temperature") if on else None, "unit": "°C"}
+        # `points`/`cap`/`status` are the console's names; `values`/`stat` kept as aliases.
+        spark = {"label": "Indoor °C · 6h", "points": vals, "values": vals, "cap": stat, "stat": stat,
+                 "threshold": st.get("target_temperature") if on else None, "unit": "°C",
+                 "status": "warn" if down else None}
 
     if alerts:
         headline = alerts[0]["text"]
@@ -494,6 +532,7 @@ async def module_manifest() -> dict[str, Any]:
         # Every alert this module can raise, for the console's per-kind settings. Alerts on
         # /api/summary carry `kind` and a stable `key` (home.<kind>.<device>).
         "alertKinds": ALERT_KINDS,
+        "notifications": NOTIFICATIONS,
         # One press on the console's home tile: the lead AC's power. The
         # state it reports rides on /api/summary's `quick`, so the button
         # shows what the house is actually doing.

@@ -126,8 +126,8 @@ function acPanel(d) {
   ].join('');
 
   const parkBtn = d.parked && !live
-    ? `<button class="btn sm ghost" data-park="0" data-id="${esc(d.id)}">It's back on</button>`
-    : d.down ? `<button class="btn sm ghost" data-park="1" data-id="${esc(d.id)}" title="Stop flagging it; it is picked up again by itself">Off at the wall</button>` : '';
+    ? `<button class="btn sm" data-park="0" data-id="${esc(d.id)}">It's back on</button>`
+    : d.down ? `<button class="btn sm" data-park="1" data-id="${esc(d.id)}" title="Stop flagging it; it is picked up again by itself">Off at the wall</button>` : '';
 
   return `
   <section class="panel ho-ac" data-device="${esc(d.id)}">
@@ -137,13 +137,13 @@ function acPanel(d) {
         <div class="ho-who">
           <div class="sname">${esc(d.name)}${extra}</div>
           <span class="st" title="${esc(s.title || '')}"><span class="dot" style="--c:${col(s.s)}"></span><span>${esc(s.text)}</span></span>
+          ${parkBtn}
         </div>
-        ${parkBtn}
         <button class="sw" role="switch" aria-checked="${!!st.power && live}" aria-label="Power" data-toggle="power" ${live ? '' : 'disabled'}></button>
       </div>
       <div class="ho-setp${ctl ? '' : ' off'}">
         <button class="ho-stp" type="button" data-step="-1" aria-label="Lower setpoint" ${!ctl || target <= cap.min ? 'disabled' : ''}>${ic('i-minus', 'l')}</button>
-        <div class="ho-v m" aria-live="polite"><span>${esc(num(target, 0))}</span><small>°C</small></div>
+        <div class="ho-v m" aria-live="polite">${!live && !d.last_seen ? '<span>—</span>' : `<span>${esc(num(target, 0))}</span><small>°C</small>`}</div>
         <button class="ho-stp" type="button" data-step="1" aria-label="Raise setpoint" ${!ctl || target >= cap.max ? 'disabled' : ''}>${ic('i-plus', 'l')}</button>
         <span class="ho-range m">${esc(cap.min)}–${esc(cap.max)}°</span>
       </div>
@@ -152,8 +152,8 @@ function acPanel(d) {
     </div>
     <div class="ho-temps">
       <div class="ho-reads${stale}">
-        <div class="metric"><div class="ml">Indoor</div><div class="mv">${esc(num(st.indoor_temperature))}<span class="u">°C</span></div></div>
-        <div class="metric" title="Thermistor on the outdoor unit's coil, not outside air: it reads well above ambient while the compressor runs"><div class="ml">Outdoor coil</div><div class="mv">${esc(num(st.outdoor_temperature, 0))}<span class="u">°C</span></div></div>
+        <div class="metric"><div class="ml">Indoor</div><div class="mv">${esc(num(st.indoor_temperature))}${st.indoor_temperature != null ? '<span class="u">°C</span>' : ''}</div></div>
+        <div class="metric" title="Thermistor on the outdoor unit's coil, not outside air: it reads well above ambient while the compressor runs"><div class="ml">Outdoor coil</div><div class="mv">${esc(num(st.outdoor_temperature, 0))}${st.outdoor_temperature != null ? '<span class="u">°C</span>' : ''}</div></div>
         ${hum != null ? `<div class="metric"><div class="ml">Humidity</div><div class="mv">${esc(num(hum, 0))}<span class="u">%</span></div></div>` : ''}
         ${delta != null ? `<div class="metric"><div class="ml">Since on</div><div class="mv"${delta <= -0.2 ? ' style="--c:var(--ok)"' : ''}>${delta > 0 ? '+' : delta < 0 ? '−' : ''}${esc(Math.abs(delta).toFixed(1))}<span class="u">°</span></div></div>` : ''}
         <div class="seg sm ho-hours" data-seg="ho-hours" role="group" aria-label="Chart range"><span class="ind"></span>
@@ -422,9 +422,9 @@ function render() {
     <section class="sec ho-details" id="ho-details">
       <div class="sh"><h2>Details</h2>
         <div class="r"><div class="seg" data-seg="ho-tabs" role="tablist" aria-label="Details"><span class="ind"></span>
-          ${TABS.map((t) => `<button type="button" role="tab" data-tab="${t.id}" aria-pressed="${state.tab === t.id}" aria-selected="${state.tab === t.id}">${t.label}</button>`).join('')}
+          ${TABS.map((t) => `<button type="button" role="tab" id="ho-tab-${t.id}" aria-controls="ho-panel" data-tab="${t.id}" aria-selected="${state.tab === t.id}" tabindex="${state.tab === t.id ? 0 : -1}">${t.label}</button>`).join('')}
         </div></div></div>
-      <div class="ho-det-body" role="tabpanel">${(tabs[state.tab] || controlsTab)()}</div>
+      <div class="ho-det-body" id="ho-panel" role="tabpanel" aria-labelledby="ho-tab-${state.tab}">${(tabs[state.tab] || controlsTab)()}</div>
     </section>
   </div>`;
   if (keep) root.querySelector('.ho-det-body').scrollTop = keep;
@@ -711,7 +711,24 @@ const onClick = async (ev) => {
 };
 
 const onKeydown = (ev) => {
-  if (ev.key === 'Escape' && state.editor) closeEditor();
+  if (state.editor) {
+    if (ev.key === 'Escape') { closeEditor(); return; }
+    if (ev.key === 'Tab') {             // keep focus inside the dialog
+      const f = [...document.querySelectorAll('#ho-modal button, #ho-modal input, #ho-modal select')].filter((n) => !n.disabled);
+      if (!f.length) return;
+      if (ev.shiftKey && document.activeElement === f[0]) { ev.preventDefault(); f.at(-1).focus(); }
+      else if (!ev.shiftKey && document.activeElement === f.at(-1)) { ev.preventDefault(); f[0].focus(); }
+    }
+    return;
+  }
+  // Details tabs: arrow keys move between tabs (roving tabindex).
+  const tab = ev.target.closest?.('[data-tab]');
+  if (tab && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft')) {
+    const i = TABS.findIndex((x) => x.id === tab.dataset.tab);
+    state.tab = TABS[(i + (ev.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id;
+    render();
+    root?.querySelector(`[data-tab="${state.tab}"]`)?.focus();
+  }
 };
 
 const onChange = (ev) => {

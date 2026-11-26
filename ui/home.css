@@ -21,6 +21,8 @@
 .homem .ho-head{display:flex;align-items:center;gap:12px}
 .homem .ho-who{margin-right:auto;min-width:0;display:grid;gap:2px}
 .homem .ho-who .sname{flex-wrap:wrap}
+.homem .ho-who .st{white-space:normal}
+.homem .ho-who .btn{justify-self:start;margin-top:6px}
 
 /* setpoint: − 24°C + */
 .homem .ho-setp{display:flex;align-items:center;gap:16px;margin:20px 0 22px}
@@ -102,6 +104,15 @@
 .homem .ho-erow.on label{color:var(--fg)}
 .homem .ho-erow input[type="checkbox"]{width:16px;height:16px;accent-color:var(--acc);margin:0}
 .homem .ho-eval{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+
+/* Touch: the shared 26px segments and 20px switch are mouse-sized; give fingers room
+   on this page's own controls without changing the shared component. */
+@media (pointer:coarse){
+  .homem .ho-ctl .seg button,.homem .ho-det .seg button{height:36px;padding:0 12px}
+  .homem .ho-hours button{height:30px}
+  .homem .sw{position:relative}
+  .homem .sw::before{content:"";position:absolute;inset:-12px -6px}
+}
 
 @media (hover:hover) and (pointer:fine){
   .homem .ho-stp:not(:disabled):hover{background:var(--hover)}

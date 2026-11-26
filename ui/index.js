@@ -26,7 +26,10 @@ const state = {
   snapshot: null,
   history: {},             // device id -> {points, on_since, hours}
   hours: 6,
-  tab: 'controls',
+  tab: 'scenes',
+  sheet: null,             // device id whose Advanced sheet is open
+  zoneDraft: null,         // the zone being added / edited
+  recent: null,            // the phone's recent location reports
   connected: null,
   editor: null,
   pendingSet: {},          // device id -> {value, timer}
@@ -34,13 +37,14 @@ const state = {
 };
 
 const TABS = [
-  { id: 'controls', label: 'Controls' },
   { id: 'scenes', label: 'Scenes' },
   { id: 'automations', label: 'Automations' },
+  { id: 'places', label: 'Places' },
+  { id: 'devices', label: 'Devices' },
   { id: 'activity', label: 'Activity' },
 ];
-/** Old view ids still deep-link: they land on the page with the right Details tab. */
-const VIEW_TAB = { devices: 'controls', controls: 'controls', scenes: 'scenes', automations: 'automations', activity: 'activity', details: 'controls' };
+/** Old view ids still deep-link: they land on the page with the right Manage tab. */
+const VIEW_TAB = { devices: 'devices', controls: 'devices', scenes: 'scenes', automations: 'automations', activity: 'activity', places: 'places', zones: 'places', details: 'scenes' };
 
 const TRIGGER_ATTRS = [
   { value: 'indoor_temperature', label: 'Indoor temperature' },
@@ -149,6 +153,7 @@ function acPanel(d) {
       </div>
       <div class="ho-row"><span class="ho-lbl">Mode</span>${seg(d, 'mode', !ctl)}</div>
       <div class="ho-row"><span class="ho-lbl">Fan</span>${seg(d, 'fan', !ctl)}</div>
+      <div class="ho-adv"><button class="btn sm" data-advanced="${esc(d.id)}" aria-haspopup="dialog">${ic('i-sliders', 's')}Advanced</button><span class="cap">${esc(advancedHint(d))}</span></div>
     </div>
     <div class="ho-temps">
       <div class="ho-reads${stale}">
@@ -293,49 +298,170 @@ const GLYPH_TITLES = {
   eco: { off: 'Eco off: full power', level1: 'Eco 1: light power cap', level2: 'Eco 2: medium cap', level3: 'Eco 3: hardest cap, slowest cooling' },
 };
 
-function controlsTab() {
-  return devices().map((d) => {
-    const live = d.available;
-    const on = live && d.state.power;
-    const enums = (d.capabilities || []).filter((c) => c.kind === 'enum' && !['mode', 'fan'].includes(c.key));
-    const switches = (d.capabilities || []).filter((c) => c.kind === 'switch' && c.key !== 'power');
-    const actions = (d.capabilities || []).filter((c) => c.kind === 'action');
-    const t = d.transport || {};
-    const confirmKey = (k) => `${d.id}|${k}`;
-    return `<div class="panel ho-det" data-device="${esc(d.id)}">
-      ${enums.map((c) => {
-        const dis = !live || (c.needs_power && !on);
-        const glyph = GLYPHS[c.key]; const titles = GLYPH_TITLES[c.key] || {};
-        return `<div class="set ho-enum"><div class="t">${esc(c.label)}</div><div class="d">${esc(c.hint || '')}</div>
-          <div class="ctrl"><div class="seg${glyph ? ' ho-gseg' : ''}" data-seg="${esc(`${d.id}-${c.key}`)}" role="group" aria-label="${esc(c.label)}"><span class="ind"></span>
-          ${c.options.filter((o) => !(c.key === 'swing_horizontal' && o.value === 'p2')).map((o) => {
-            const title = titles[o.value] || o.label;
-            return `<button type="button" data-set="${esc(c.key)}" data-value="${esc(o.value)}" aria-pressed="${d.state[c.key] === o.value}" ${glyph ? `aria-label="${esc(title)}" title="${esc(title)}"` : ''} ${dis ? 'disabled' : ''}>${glyph ? glyph(o.value, title) : esc(o.label)}</button>`;
-          }).join('')}</div></div></div>`;
-      }).join('')}
-      ${switches.map((c) => {
-        const dis = !live || (c.needs_power && !on);
-        return `<div class="set"><div class="t">${esc(c.label)}</div><div class="d">${esc(c.hint || '')}</div>
-          <div class="ctrl"><button class="sw" role="switch" aria-checked="${!!d.state[c.key]}" aria-label="${esc(c.label)}" data-toggle="${esc(c.key)}" ${dis ? 'disabled' : ''}></button></div></div>`;
-      }).join('')}
-      ${actions.map((c) => (state.confirm === confirmKey(c.key)
-        ? `<div class="confirm"><p><b>${esc(c.label)}?</b> ${esc(c.hint || 'Runs to completion on the unit.')}</p><div class="acts"><button class="btn sm" data-cancel>Cancel</button><button class="btn sm pri" data-run="${esc(c.key)}">Start</button></div></div>`
-        : `<div class="set"><div class="t">${esc(c.label)}</div><div class="d">${esc(c.hint || '')}</div><div class="ctrl"><button class="btn sm" data-ask="${esc(c.key)}" ${live ? '' : 'disabled'}>Run</button></div></div>`)).join('')}
-      <div class="set"><div class="t">Switched off at the wall</div><div class="d">No alerts while off; picked up again the first time it answers</div>
-        <div class="ctrl"><button class="sw" role="switch" aria-checked="${!!d.parked}" aria-label="Switched off at the wall" data-park="${d.parked ? 0 : 1}" data-id="${esc(d.id)}"></button></div></div>
-      <div class="ho-info">
-        <dl>
-          <div><dt>Room</dt><dd>${esc(d.room || '—')}</dd></div>
-          <div><dt>Unit</dt><dd class="m">${esc(t.type_id || '—')}</dd></div>
-          <div><dt>Link</dt><dd class="m">${esc(t.host ? `${t.host}:${t.port}` : (d.simulated ? 'simulated' : '—'))}</dd></div>
-          <div><dt>Key</dt><dd class="m">${t.localkey_version != null ? `v${esc(t.localkey_version)}` : '—'}</dd></div>
-          <div><dt>Last read</dt><dd class="m">${d.last_seen ? `${esc(day(d.last_seen))} ${esc(hm(d.last_seen))}` : '—'}</dd></div>
-          <div><dt>Changed by</dt><dd>${esc(d.state.last_changed_by || '—')}</dd></div>
-        </dl>
-        <div class="btns"><button class="btn sm" data-refresh="${esc(d.id)}">${ic('i-refresh', 's')}Read now</button><button class="btn sm ghost" data-rename="${esc(d.id)}">${ic('i-edit', 's')}Rename</button></div>
-      </div>
-    </div>`;
-  }).join('');
+/** "Swing, eco, turbo, quiet…": what the Advanced sheet holds, from the capability list. */
+function advancedHint(d) {
+  const keys = (d.capabilities || []).filter((c) => !['power', 'mode', 'fan', 'target_temperature'].includes(c.key) && c.kind !== 'readout');
+  const words = keys.map((c) => c.label.replace(/ swing$/i, '').toLowerCase());
+  const uniq = [...new Set(words.map((w) => (w === 'vertical' || w === 'horizontal' ? 'swing' : w)))];
+  return uniq.slice(0, 5).join(', ') + (uniq.length > 5 ? '…' : '');
+}
+
+function capControl(d, c, live, on) {
+  const dis = !live || (c.needs_power && !on);
+  if (c.kind === 'enum') {
+    const glyph = GLYPHS[c.key]; const titles = GLYPH_TITLES[c.key] || {};
+    return `<div class="seg${glyph ? ' ho-gseg' : ''}" data-seg="${esc(`sh-${d.id}-${c.key}`)}" role="group" aria-label="${esc(c.label)}"><span class="ind"></span>
+      ${c.options.filter((o) => !(c.key === 'swing_horizontal' && o.value === 'p2')).map((o) => {
+        const title = titles[o.value] || o.label;
+        return `<button type="button" data-set="${esc(c.key)}" data-value="${esc(o.value)}" aria-pressed="${d.state[c.key] === o.value}" ${glyph ? `aria-label="${esc(title)}" title="${esc(title)}"` : ''} ${dis ? 'disabled' : ''}>${glyph ? `${glyph(o.value, title)}` : esc(o.label)}</button>`;
+      }).join('')}</div>`;
+  }
+  if (c.kind === 'switch') {
+    return `<button class="sw" role="switch" aria-checked="${!!d.state[c.key] && (c.key !== 'power' || live)}" aria-label="${esc(c.label)}" data-toggle="${esc(c.key)}" ${c.key === 'power' ? (live ? '' : 'disabled') : (dis ? 'disabled' : '')}></button>`;
+  }
+  if (c.kind === 'range') {
+    const pend = state.pendingSet[d.id];
+    const v = c.key === 'target_temperature' && pend ? pend.value : Number(d.state[c.key] ?? c.min);
+    return `<div class="ho-mini"><button class="ho-stp sm" type="button" data-step="-1" data-key="${esc(c.key)}" aria-label="Lower ${esc(c.label)}" ${dis || v <= c.min ? 'disabled' : ''}>${ic('i-minus', 's')}</button><span class="m">${esc(num(v, 0))}${esc(c.unit || '')}</span><button class="ho-stp sm" type="button" data-step="1" data-key="${esc(c.key)}" aria-label="Raise ${esc(c.label)}" ${dis || v >= c.max ? 'disabled' : ''}>${ic('i-plus', 's')}</button></div>`;
+  }
+  if (c.kind === 'action') {
+    return `<button class="btn sm" data-ask="${esc(c.key)}" ${live ? '' : 'disabled'}>Run</button>`;
+  }
+  return '';
+}
+
+/* Everything the driver exposes, in its own order, drawn from the capability list —
+   a new capability shows up here with no change to this file. Then every reading,
+   including state keys no capability names (fault code, who changed it last). */
+const STATE_LABELS = { error_code: 'Fault code', last_changed_by: 'Changed by', self_cleaning: 'Self-cleaning' };
+function advancedPanel(d) {
+  const live = d.available;
+  const on = live && d.state.power;
+  const caps = d.capabilities || [];
+  const controls = caps.filter((c) => c.kind !== 'readout');
+  const reads = caps.filter((c) => c.kind === 'readout');
+  const named = new Set(caps.map((c) => c.key).concat(['self_clean']));
+  const extraState = Object.keys(d.state).filter((k) => !named.has(k));
+  const t = d.transport || {};
+  const s = status(d);
+  const fmtState = (k, v) => (k === 'error_code' ? (v ? `E${v}` : 'none') : v === true ? 'yes' : v === false ? 'no' : v ?? '—');
+  return `<div class="ho-sh" data-device="${esc(d.id)}">
+    <header class="ho-sh-head"><span class="sic">${ic('i-snow')}</span><div class="grow"><h2 id="ho-sheet-t">${esc(d.name)}</h2>
+      <span class="st"><span class="dot" style="--c:${col(s.s)}"></span><span>${esc(s.text)}</span></span></div>
+      <button class="ib" data-sheet-close aria-label="Close">${ic('i-x')}</button></header>
+    <div class="ho-sh-scroll"><div class="ho-sh-list">
+    ${controls.map((c) => (c.kind === 'action' && state.confirm === `${d.id}|${c.key}`
+    ? `<div class="confirm"><p><b>${esc(c.label)}?</b> ${esc(c.hint || 'Runs to completion on the unit.')}</p><div class="acts"><button class="btn sm" data-cancel>Cancel</button><button class="btn sm pri" data-run="${esc(c.key)}">Start</button></div></div>`
+    : `<div class="ho-cap ${c.kind === 'enum' ? 'col' : ''}"><div class="ho-cap-t"><div class="t">${esc(c.label)}</div>${c.hint ? `<div class="d">${esc(c.hint)}</div>` : ''}</div><div class="ho-cap-c">${capControl(d, c, live, on)}</div></div>`)).join('')}
+    </div>
+    <div class="ho-sh-sec"><div class="ml">Readings${live ? '' : ' · last known'}</div><dl class="ho-dl">
+      ${reads.map((c) => `<div><dt>${esc(c.label)}</dt><dd class="m">${esc(num(d.state[c.key], c.key === 'outdoor_temperature' ? 0 : 1))}${d.state[c.key] != null ? esc(c.unit || '') : ''}</dd></div>`).join('')}
+      ${extraState.map((k) => `<div><dt>${esc(STATE_LABELS[k] || k.replace(/_/g, ' '))}</dt><dd class="m${k === 'error_code' && d.state[k] ? ' ho-err' : ''}">${esc(fmtState(k, d.state[k]))}</dd></div>`).join('')}
+    </dl></div>
+    <div class="ho-sh-sec"><div class="ml">Unit</div><dl class="ho-dl">
+      <div><dt>Room</dt><dd>${esc(d.room || '—')}</dd></div>
+      <div><dt>Model</dt><dd class="m">${esc(t.type_id || '—')}</dd></div>
+      <div><dt>Wi-Fi id</dt><dd class="m">${esc(t.device_id || '—')}</dd></div>
+      <div><dt>Link</dt><dd class="m">${esc(t.host ? `${t.host}:${t.port}` : (d.simulated ? 'simulated' : '—'))}</dd></div>
+      <div><dt>Key</dt><dd class="m">${t.localkey_version != null ? `v${esc(t.localkey_version)}` : '—'}</dd></div>
+      <div><dt>Last read</dt><dd class="m">${d.last_seen ? `${esc(day(d.last_seen))} ${esc(hm(d.last_seen))}` : '—'}</dd></div>
+      ${d.last_error ? `<div class="wide"><dt>Last error</dt><dd>${esc(d.last_error)}</dd></div>` : ''}
+    </dl></div>
+    <div class="ho-cap"><div class="ho-cap-t"><div class="t">Switched off at the wall</div><div class="d">No alerts while off; picked up again when it answers</div></div>
+      <div class="ho-cap-c"><button class="sw" role="switch" aria-checked="${!!d.parked}" aria-label="Switched off at the wall" data-park="${d.parked ? 0 : 1}" data-id="${esc(d.id)}"></button></div></div>
+    <div class="ho-sh-foot"><button class="btn sm" data-refresh="${esc(d.id)}">${ic('i-refresh', 's')}Read now</button><button class="btn sm ghost" data-rename="${esc(d.id)}">${ic('i-edit', 's')}Rename</button></div>
+  </div></div>`;
+}
+
+/* ---------- home: scene shortcuts + automation summary ---------- */
+function lastRuns(prefix) {
+  const out = {};
+  for (const e of state.snapshot.activity || []) {
+    const m = (e.message || '').match(new RegExp(`^${prefix} '(.+)' (ran|activated|failed)`));
+    if (!m) continue;
+    const prev = out[m[1]];
+    // The hub logs "failed" and then "ran" for a run whose action failed: same run, failed.
+    if (!prev) out[m[1]] = { ts: e.ts, ok: m[2] !== 'failed' };
+    else if (m[2] === 'failed' && Math.abs(prev.ts - e.ts) < 5) prev.ok = false;
+  }
+  return out;
+}
+
+function sceneShortcuts() {
+  const list = state.snapshot.scenes || [];
+  const runs = lastRuns('Scene');
+  return `<section class="sec"><div class="sh"><h2>Scenes</h2><span class="note">one tap</span>
+      <div class="r"><button class="btn sm ghost" data-tab-go="scenes">Manage${ic('i-chev', 's')}</button></div></div>
+    ${list.length ? `<div class="ho-scenes">${list.map((sc) => `<button class="panel ho-scene" data-scene="${esc(sc.id)}">
+      <span class="ho-scene-n">${esc(sc.name)}</span>
+      <span class="ho-scene-d">${esc(sc.description || (sc.actions || []).map((a) => summarise(a.command)).join(' / '))}</span>
+      <span class="ho-scene-m m">${runs[sc.name] ? `ran ${esc(hm(runs[sc.name].ts))}` : esc(sc.code || '')}</span>
+    </button>`).join('')}</div>`
+    : `<div class="panel"><div class="empty">${ic('i-scene')}<b>No scenes</b><button class="btn sm" data-new-scene>${ic('i-plus', 's')}New scene</button></div></div>`}
+  </section>`;
+}
+
+function automationSummary() {
+  const list = state.snapshot.automations || [];
+  const runs = lastRuns('Automation');
+  const p = state.snapshot.presence || {};
+  const phone = p.zone_name && p.zone_name !== 'unknown' ? p.zone_name : p.last_fix ? 'away' : null;
+  return `<section class="sec"><div class="sh"><h2>Automations</h2><span class="note">${list.filter((a) => a.enabled).length} of ${list.length} on${phone ? ` · phone ${esc(phone)}` : ''}</span>
+      <div class="r"><button class="btn sm ghost" data-tab-go="automations">Manage${ic('i-chev', 's')}</button></div></div>
+    <div class="panel">${list.length ? `<div class="rows">${list.map((a) => {
+      const r = runs[a.name];
+      return `<div class="row"><button class="sw" role="switch" aria-checked="${!!a.enabled}" aria-label="Enable ${esc(a.name)}" data-automation="${esc(a.id)}"></button>
+        <div class="grow"><div class="t">${esc(a.name)}</div><div class="d">${esc(describeTrigger(a.trigger))}</div></div>
+        <span class="ho-run m${r && !r.ok ? ' bad' : ''}">${r ? `${r.ok ? 'ran' : 'failed'} ${esc(day(r.ts))} ${esc(hm(r.ts))}` : 'not run yet'}</span></div>`;
+    }).join('')}</div>` : `<div class="empty">${ic('i-auto')}<b>No automations</b><button class="btn sm" data-new-auto>${ic('i-plus', 's')}New automation</button></div>`}</div>
+  </section>`;
+}
+
+/* ---------- manage: places (zones + the phone) ---------- */
+function placesTab() {
+  const p = state.snapshot.presence || {};
+  const zones = p.zones || [];
+  const fix = p.last_fix;
+  const z = state.zoneDraft;
+  const zoneForm = z ? `<div class="ho-zform" data-zone-form>
+      <div class="field"><label for="z-name">Name</label><input class="input" id="z-name" data-zfield="name" value="${esc(z.name || '')}" maxlength="40"></div>
+      <div class="field"><label for="z-lat">Latitude</label><input class="input m" id="z-lat" inputmode="decimal" data-zfield="lat" value="${esc(z.lat ?? '')}"></div>
+      <div class="field"><label for="z-lon">Longitude</label><input class="input m" id="z-lon" inputmode="decimal" data-zfield="lon" value="${esc(z.lon ?? '')}"></div>
+      <div class="field"><label for="z-r">Radius m</label><input class="input num" id="z-r" type="number" inputmode="numeric" min="50" max="5000" step="10" data-zfield="radius" value="${esc(z.radius ?? 150)}"></div>
+      <div class="btns">${fix ? '<button class="btn sm ghost" data-zone-fix>Use phone\'s last fix</button>' : ''}<button class="btn sm" data-zone-cancel>Cancel</button><button class="btn sm pri" data-zone-save>Save place</button></div>
+    </div>` : '';
+  const rec = state.recent;
+  return `<div class="panel">
+    <div class="ho-presence">
+      <div class="metric"><div class="ml">Phone is</div><div class="mv">${esc(p.zone_name && p.zone_name !== 'unknown' ? p.zone_name : fix ? 'Away' : 'Unknown')}</div></div>
+      <div class="metric"><div class="ml">Last fix</div><div class="mv m">${fix ? `${esc(day(fix.ts))} ${esc(hm(fix.ts))}` : '—'}</div></div>
+      <div class="metric"><div class="ml">Accuracy</div><div class="mv">${fix?.acc != null ? `${esc(Math.round(fix.acc))}<span class="u">m</span>` : '—'}</div></div>
+      <div class="metric"><div class="ml">Battery</div><div class="mv">${fix?.battery != null ? `${esc(fix.battery)}<span class="u">%</span>` : '—'}</div></div>
+      ${fix && !p.fresh ? tag('Stale fix', 'warn', 'Older than an hour: presence keeps the last place but does not trust it') : fix ? tag('Reporting', 'ok') : tag('No reports', null, 'Point OwnTracks at /api/location')}
+    </div>
+    <div class="rows ho-zones">${zones.map((zn) => `<div class="row"><span class="sic">${ic('i-house')}</span>
+      <div class="grow"><div class="t">${esc(zn.name)}${p.zone === zn.id ? ` ${tag('phone here', 'ok')}` : ''}</div><div class="d m">${esc(Number(zn.lat).toFixed(5))}, ${esc(Number(zn.lon).toFixed(5))} · ${esc(Math.round(zn.radius))} m</div></div>
+      <button class="ib" data-zone-edit="${esc(zn.id)}" aria-label="Edit ${esc(zn.name)}">${ic('i-edit')}</button>
+      <button class="ib" data-zone-del="${esc(zn.id)}" aria-label="Delete ${esc(zn.name)}">${ic('i-trash')}</button></div>`).join('') || `<div class="empty">${ic('i-house')}<b>No places</b><span>A place is what an arrive / leave automation watches.</span></div>`}</div>
+    ${zoneForm}
+    <div class="ho-foot"><button class="btn sm ghost" data-recent>${rec ? 'Hide' : 'Recent'} reports</button>${z ? '' : `<button class="btn sm" data-zone-new>${ic('i-plus', 's')}New place</button>`}</div>
+    ${rec ? `<div class="ho-recent"><table class="t"><thead><tr><th>Time</th><th>Type</th><th>Trigger</th><th>Region</th><th class="num">±m</th></tr></thead><tbody>
+      ${rec.length ? rec.map((r) => `<tr><td class="m">${esc(day(r.ts))} ${esc(hm(r.ts))}</td><td>${esc(r.type || '—')}</td><td>${esc(r.trigger || r.event || '—')}</td><td>${esc(r.region || '—')}</td><td class="num m">${esc(r.acc ?? '—')}</td></tr>`).join('') : '<tr><td colspan="5" class="muted">Nothing received yet</td></tr>'}
+    </tbody></table></div>` : ''}
+  </div>`;
+}
+
+/* ---------- manage: devices ---------- */
+function devicesTab() {
+  const list = devices();
+  return `<div class="panel">${list.length ? `<div class="rows">${list.map((d) => {
+    const s = status(d); const t = d.transport || {};
+    return `<div class="row"><span class="sic">${ic('i-ac')}</span>
+      <div class="grow"><div class="t">${esc(d.name)} ${d.simulated ? tag('Simulated') : ''}</div><div class="d"><span class="st"><span class="dot" style="--c:${col(s.s)}"></span><span>${esc(s.text)}</span></span> · ${esc(d.room || 'no room')} · <span class="m">${esc(t.type_id || d.kind)}</span></div></div>
+      <button class="btn sm" data-advanced="${esc(d.id)}">Advanced</button>
+      <button class="ib" data-refresh="${esc(d.id)}" aria-label="Read ${esc(d.name)} now">${ic('i-refresh')}</button>
+      <button class="ib" data-rename="${esc(d.id)}" aria-label="Rename ${esc(d.name)}">${ic('i-edit')}</button></div>`;
+  }).join('')}</div>` : `<div class="empty">${ic('i-ac')}<b>No devices</b><span>Set AC_HOST, AC_DEVICE_ID and AC_LOCAL_KEY.</span></div>`}</div>`;
 }
 
 const WORDS = { target_temperature: 'setpoint', swing_vertical: 'vertical swing', swing_horizontal: 'horizontal swing', self_clean: 'self-clean' };
@@ -413,23 +539,117 @@ function render() {
   const s = state.snapshot;
   const lead = s.devices[0];
   const sub = lead ? [lead.room || null, lead.transport?.host ? 'local LAN' : null].filter(Boolean).join(' · ') : '';
-  const tabs = { controls: controlsTab, scenes: scenesTab, automations: automationsTab, activity: activityTab };
+  const tabs = { scenes: scenesTab, automations: automationsTab, places: placesTab, devices: devicesTab, activity: activityTab };
   const keep = root.querySelector('.ho-det-body')?.scrollTop;
   root.innerHTML = `<div class="page homem">
     <div class="ph"><div><h1>Home</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
       <div class="acts">${state.connected === false ? tag('Reconnecting', 'warn') : ''}${s.hub?.demo ? tag('Demo') : ''}</div></div>
     ${s.devices.length ? s.devices.map(acPanel).join('') : `<div class="panel"><div class="empty">${ic('i-ac')}<b>No devices</b><span>Set AC_HOST, AC_DEVICE_ID and AC_LOCAL_KEY.</span></div></div>`}
+    <div class="ho-two">${sceneShortcuts()}${automationSummary()}</div>
     <section class="sec ho-details" id="ho-details">
-      <div class="sh"><h2>Details</h2>
-        <div class="r"><div class="seg" data-seg="ho-tabs" role="tablist" aria-label="Details"><span class="ind"></span>
+      <div class="sh"><h2>Manage</h2>
+        <div class="r"><div class="seg" data-seg="ho-tabs" role="tablist" aria-label="Manage"><span class="ind"></span>
           ${TABS.map((t) => `<button type="button" role="tab" id="ho-tab-${t.id}" aria-controls="ho-panel" data-tab="${t.id}" aria-selected="${state.tab === t.id}" tabindex="${state.tab === t.id ? 0 : -1}">${t.label}</button>`).join('')}
         </div></div></div>
-      <div class="ho-det-body" id="ho-panel" role="tabpanel" aria-labelledby="ho-tab-${state.tab}">${(tabs[state.tab] || controlsTab)()}</div>
+      <div class="ho-det-body" id="ho-panel" role="tabpanel" aria-labelledby="ho-tab-${state.tab}">${(tabs[state.tab] || scenesTab)()}</div>
     </section>
   </div>`;
   if (keep) root.querySelector('.ho-det-body').scrollTop = keep;
   ui3?.placeSegs(root);
   root.querySelectorAll('[data-chart]').forEach(bindChart);
+  renderSheet();
+}
+
+/* ---------- the Advanced sheet ----------
+   A side sheet on a wide screen, a bottom sheet on a phone (by viewport, since the
+   sheet lives on <body>, outside the console's container). It slides with the
+   drawer curve on transform only, keeps its content live while open (SSE updates
+   re-render the body, never replay the entrance), and on a phone the handle drags
+   it down: a flick or a third of its height closes it. */
+let sheetOpener = null;
+const phoneSheet = () => matchMedia('(max-width: 699px)').matches;
+
+function sheetHost() {
+  let h = document.getElementById('ho-sheet');
+  if (h) return h;
+  h = document.createElement('div');
+  h.id = 'ho-sheet';
+  h.className = 'homem ho-sheet-host';
+  h.innerHTML = `<div class="ho-scrim" data-sheet-close></div>
+    <aside class="ho-sheet" role="dialog" aria-modal="true" aria-labelledby="ho-sheet-t" tabindex="-1">
+      <div class="ho-grab" data-grab aria-hidden="true"><i></i></div>
+      <div class="ho-sheet-body"></div>
+    </aside>`;
+  document.body.appendChild(h);
+  bindDrag(h.querySelector('.ho-sheet'), h.querySelector('[data-grab]'));
+  return h;
+}
+
+function openSheet(id, opener) {
+  sheetOpener = opener || null;
+  state.sheet = id;
+  state.confirm = null;
+  const h = sheetHost();
+  h.hidden = false;
+  renderSheet();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    h.classList.add('open');
+    h.querySelector('.ho-sheet').focus({ preventScroll: true });
+  }));
+}
+
+function closeSheet() {
+  const h = document.getElementById('ho-sheet');
+  state.sheet = null;
+  state.confirm = null;
+  if (!h) return;
+  const panel = h.querySelector('.ho-sheet');
+  panel.style.transform = '';
+  h.classList.remove('open');
+  const done = () => { if (!state.sheet) { h.hidden = true; h.querySelector('.ho-sheet-body').innerHTML = ''; } };
+  panel.addEventListener('transitionend', done, { once: true });
+  setTimeout(done, 400);
+  sheetOpener?.focus?.();
+}
+
+function renderSheet() {
+  if (!state.sheet) return;
+  const d = deviceById(state.sheet);
+  const h = document.getElementById('ho-sheet');
+  if (!d || !h) return;
+  const body = h.querySelector('.ho-sheet-body');
+  const top = body.querySelector('.ho-sh-scroll')?.scrollTop || 0;
+  body.innerHTML = advancedPanel(d);
+  body.querySelector('.ho-sh-scroll').scrollTop = top;
+  ui3?.placeSegs(body);
+}
+
+function bindDrag(panel, handle) {
+  let start = null;
+  handle.addEventListener('pointerdown', (e) => {
+    if (!phoneSheet() || start) return;          // one finger; desktop sheets do not drag
+    start = { y: e.clientY, t: performance.now(), dy: 0 };
+    handle.setPointerCapture(e.pointerId);
+    panel.style.transition = 'none';
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    const dy = e.clientY - start.y;
+    // Upward drag gets friction instead of a wall; downward follows the finger.
+    start.dy = dy < 0 ? -Math.sqrt(-dy) * 2 : dy;
+    panel.style.transform = `translateY(${start.dy}px)`;
+  });
+  const end = () => {
+    if (!start) return;
+    const v = start.dy / Math.max(1, performance.now() - start.t);
+    const far = start.dy > panel.offsetHeight / 3;
+    panel.style.transition = '';
+    if (far || v > 0.5) closeSheet();
+    else panel.style.transform = '';
+    start = null;
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
 }
 
 /* ---------- editor (scenes, automations, rename) ---------- */
@@ -491,7 +711,9 @@ function renderEditor() {
   const body = ed.kind === 'device'
     ? `<div class="field"><label for="e-name">Name</label><input class="input" id="e-name" value="${esc(d.name || '')}" data-efield="name" maxlength="40"></div>
        <div class="field"><label for="e-room">Room</label><input class="input" id="e-room" value="${esc(d.room || '')}" data-efield="room" maxlength="40"></div>`
-    : `<div class="field"><label for="e-name">Name</label><input class="input" id="e-name" value="${esc(d.name || '')}" data-efield="name" maxlength="40" placeholder="${ed.kind === 'scene' ? 'Sleep' : 'Night step-up'}"></div>
+    : `<div class="ho-erow2"><div class="field"><label for="e-name">Name</label><input class="input" id="e-name" value="${esc(d.name || '')}" data-efield="name" maxlength="40" placeholder="${ed.kind === 'scene' ? 'Sleep' : 'Night step-up'}"></div>
+       ${ed.kind === 'scene' ? `<div class="field ho-code"><label for="e-code">Code</label><input class="input m" id="e-code" value="${esc(d.code || '')}" data-efield="code" maxlength="8" placeholder="SC-04"></div>` : ''}</div>
+       <div class="field"><label for="e-desc">Description</label><input class="input" id="e-desc" value="${esc(d.description || '')}" data-efield="description" maxlength="120" placeholder="What it does"></div>
        ${ed.kind === 'automation' ? triggerEditor(d) : ''}
        <div class="field"><span class="lbl">Sets</span>${actionBuilder(d)}</div>`;
   h.innerHTML = `<div class="modal-backdrop" data-backdrop><div class="modal ho-modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -638,7 +860,43 @@ const onClick = async (ev) => {
     }
     return;
   }
-  if (!root.contains(t)) return;
+  const inSheet = t.closest('#ho-sheet');
+  if (inSheet && t.closest('[data-sheet-close]')) { closeSheet(); return; }
+  if (!root.contains(t) && !inSheet) return;
+
+  const adv = t.closest('[data-advanced]');
+  if (adv) { openSheet(adv.dataset.advanced, adv); return; }
+  const go = t.closest('[data-tab-go]');
+  if (go) {
+    state.tab = go.dataset.tabGo; try { localStorage.setItem('home.tab', state.tab); } catch { /* private mode */ }
+    render(); root.querySelector('#ho-details')?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    return;
+  }
+  // places
+  if (t.closest('[data-recent]')) {
+    if (state.recent) { state.recent = null; render(); return; }
+    try { state.recent = await api('/location/recent'); } catch (err) { toast('err', 'Could not read reports', err.message); state.recent = []; }
+    render(); return;
+  }
+  if (t.closest('[data-zone-new]')) { state.zoneDraft = { id: null, name: '', lat: '', lon: '', radius: 150 }; render(); root.querySelector('#z-name')?.focus(); return; }
+  const ze = t.closest('[data-zone-edit]');
+  if (ze) { state.zoneDraft = { ...((state.snapshot.presence?.zones || []).find((z) => z.id === ze.dataset.zoneEdit) || {}) }; render(); root.querySelector('#z-name')?.focus(); return; }
+  if (t.closest('[data-zone-cancel]')) { state.zoneDraft = null; render(); return; }
+  if (t.closest('[data-zone-fix]')) {
+    const fix = state.snapshot.presence?.last_fix;
+    if (fix) { Object.assign(state.zoneDraft, { lat: fix.lat, lon: fix.lon }); render(); }
+    return;
+  }
+  if (t.closest('[data-zone-save]')) { await saveZone(); return; }
+  const zd = t.closest('[data-zone-del]');
+  if (zd) {
+    const zones = state.snapshot.presence?.zones || [];
+    const z = zones.find((x) => x.id === zd.dataset.zoneDel);
+    const used = (state.snapshot.automations || []).filter((a) => a.trigger?.type === 'presence' && a.trigger.zone === z?.id);
+    if (!await confirmDialog('Delete place?', `"${z?.name}" will be removed.${used.length ? ` ${used.length} automation${used.length > 1 ? 's' : ''} watch it and will stop firing.` : ''}`)) return;
+    await putZones(zones.filter((x) => x.id !== z.id));
+    return;
+  }
 
   const h = t.closest('[data-hours]');
   if (h) { state.hours = Number(h.dataset.hours); render(); loadHistory(); return; }
@@ -701,7 +959,12 @@ const onClick = async (ev) => {
   const run = t.closest('[data-run]');
   if (run) { state.confirm = null; await send(deviceOf(run), { [run.dataset.run]: true }, { optimistic: false }); return; }
   const step = t.closest('[data-step]');
-  if (step && !step.disabled) { stepSetpoint(deviceOf(step), Number(step.dataset.step)); return; }
+  if (step && !step.disabled) {
+    const d = deviceOf(step); const key = step.dataset.key || 'target_temperature';
+    if (key === 'target_temperature') stepSetpoint(d, Number(step.dataset.step));
+    else { const c = capOf(d, key); await send(d, { [key]: Math.min(c.max, Math.max(c.min, Number(d.state[key] ?? c.min) + Number(step.dataset.step) * (c.step || 1))) }); }
+    return;
+  }
   const setter = t.closest('[data-set][data-value]');
   if (setter && !setter.disabled && setter.getAttribute('aria-pressed') !== 'true') {
     await send(deviceOf(setter), { [setter.dataset.set]: setter.dataset.value }); return;
@@ -711,6 +974,16 @@ const onClick = async (ev) => {
 };
 
 const onKeydown = (ev) => {
+  if (state.sheet && !state.editor) {
+    if (ev.key === 'Escape') { closeSheet(); return; }
+    if (ev.key === 'Tab') {
+      const f = [...document.querySelectorAll('#ho-sheet .ho-sheet button:not(:disabled)')];
+      if (!f.length) return;
+      if (ev.shiftKey && document.activeElement === f[0]) { ev.preventDefault(); f.at(-1).focus(); }
+      else if (!ev.shiftKey && document.activeElement === f.at(-1)) { ev.preventDefault(); f[0].focus(); }
+    }
+    return;
+  }
   if (state.editor) {
     if (ev.key === 'Escape') { closeEditor(); return; }
     if (ev.key === 'Tab') {             // keep focus inside the dialog
@@ -759,7 +1032,29 @@ const onChange = (ev) => {
     mutateAction(dev, key, (c) => { c[key] = v; });
   }
 };
-const onInput = (ev) => { const ef = ev.target.closest('#ho-modal [data-efield]'); if (ef && state.editor) state.editor.draft[ef.dataset.efield] = ef.value; };
+async function putZones(zones) {
+  try {
+    const saved = await api('/zones', { method: 'PUT', body: JSON.stringify(zones) });
+    state.snapshot.presence = { ...(state.snapshot.presence || {}), zones: saved };
+    state.zoneDraft = null;
+    render();
+  } catch (err) { toast('err', 'Could not save places', err.message); }
+}
+
+async function saveZone() {
+  const z = state.zoneDraft;
+  const lat = Number(z.lat); const lon = Number(z.lon); const radius = Number(z.radius) || 150;
+  if (!String(z.name || '').trim()) { toast('warn', 'Name the place'); return; }
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { toast('warn', 'Latitude and longitude are needed', 'Or use the phone\'s last fix'); return; }
+  const zones = (state.snapshot.presence?.zones || []).filter((x) => x.id !== z.id);
+  const id = z.id || String(z.name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || uid('place');
+  zones.push({ id, name: String(z.name).trim(), lat, lon, radius: Math.max(50, Math.min(5000, radius)) });
+  await putZones(zones);
+}
+
+const onInput = (ev) => {
+  const zf = ev.target.closest('[data-zfield]');
+  if (zf && state.zoneDraft) { state.zoneDraft[zf.dataset.zfield] = zf.value; return; } const ef = ev.target.closest('#ho-modal [data-efield]'); if (ef && state.editor) state.editor.draft[ef.dataset.efield] = ef.value; };
 
 /* ---------- data ---------- */
 async function refreshSnapshot() {
@@ -785,12 +1080,14 @@ function connectStream() {
         replaceDevice(m.data);
         // A write that is still being coalesced must not be overwritten by a poll.
         if (!state.pendingSet[m.data.id]) render();
+        else renderSheet();
         if (m.data.available) loadHistory();
       } else if (m.event === 'activity') {
         state.snapshot.activity = [...m.data, ...(state.snapshot.activity || [])].slice(0, 60);
         if (state.tab === 'activity') render();
       } else if (m.event === 'presence') {
         state.snapshot.presence = m.data;
+        if (state.tab === 'places' && !state.zoneDraft) render();
       } else if (m.event === 'scenes' || m.event === 'automations') {
         state.snapshot[m.event] = m.data;
         if (state.tab === m.event) render();
@@ -800,7 +1097,7 @@ function connectStream() {
 }
 
 /** Icons this page uses that a shell's sprite might lack: taken from the vendored icons3.svg. */
-const NEEDED = ['i-snow', 'i-plus', 'i-minus', 'i-chart', 'i-scene', 'i-auto', 'i-log', 'i-edit', 'i-trash', 'i-refresh', 'i-ac'];
+const NEEDED = ['i-sliders', 'i-x', 'i-chev', 'i-house', 'i-snow', 'i-plus', 'i-minus', 'i-chart', 'i-scene', 'i-auto', 'i-log', 'i-edit', 'i-trash', 'i-refresh', 'i-ac'];
 async function ensureIcons(base) {
   const missing = NEEDED.filter((id) => !document.getElementById(id));
   if (!missing.length) return;
@@ -843,13 +1140,13 @@ export default {
     await loadHistory();
     connectStream();
     histTimer = setInterval(loadHistory, 120_000);
-    if (VIEW_TAB[context.view] && context.view !== 'devices') root.querySelector('#ho-details')?.scrollIntoView({ block: 'start' });
+    if (VIEW_TAB[context.view]) root.querySelector('#ho-details')?.scrollIntoView({ block: 'start' });
   },
 
   async setView(view) {
     if (VIEW_TAB[view]) {
       state.tab = VIEW_TAB[view]; render();
-      if (view !== 'devices') root?.querySelector('#ho-details')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      root?.querySelector('#ho-details')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } else render();
   },
 
@@ -863,6 +1160,7 @@ export default {
     state.pendingSet = {};
     stream?.stop(); stream = null;
     state.editor = null; document.getElementById('ho-modal')?.remove();
+    state.sheet = null; document.getElementById('ho-sheet')?.remove();
     state.snapshot = null; state.history = {};
     root = null; ctx = null;
   },

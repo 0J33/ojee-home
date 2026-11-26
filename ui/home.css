@@ -70,31 +70,96 @@
 .homem .ho-tip{position:absolute;top:-6px;left:8px;white-space:nowrap;font-size:11.5px;color:var(--fg);background:var(--raised);border:1px solid var(--line-2);border-radius:6px;padding:4px 8px;box-shadow:var(--sh-2)}
 .homem .ho-cross.flip .ho-tip{left:auto;right:8px}
 
-/* ---------- details ---------- */
+/* ---------- AC panel: the way into Advanced ---------- */
+.homem .ho-adv{display:flex;align-items:center;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line);min-width:0}
+.homem .ho-adv .cap{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- scenes + automations summary ---------- */
+.homem .ho-two{display:grid;grid-template-columns:minmax(0,1fr);gap:0 24px}
+@container app (min-width:1000px){.homem .ho-two{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}.homem .ho-two>.sec{margin-top:28px}}
+.homem .ho-scenes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@container app (min-width:700px){.homem .ho-scenes{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.homem .ho-scene{display:grid;gap:4px;align-content:start;text-align:left;padding:12px 14px;min-height:84px;cursor:pointer;color:var(--fg);
+  transition:transform 120ms var(--ease-out),border-color 150ms ease,background-color 150ms ease;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.homem .ho-scene:active{transform:scale(.97)}
+.homem .ho-scene[aria-busy="true"]{opacity:.6;pointer-events:none}
+.homem .ho-scene-n{font-weight:600;font-size:14px;letter-spacing:-.01em}
+.homem .ho-scene-d{font-size:12px;color:var(--fg-3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.homem .ho-scene-m{font-size:11.5px;color:var(--fg-3);margin-top:auto}
+.homem .ho-run{font-size:11.5px;color:var(--fg-3);white-space:nowrap}
+.homem .ho-run.bad{color:var(--err)}
+@container app (max-width:520px){.homem .ho-run{display:none}}
+
+/* ---------- manage tabs ---------- */
 .homem .ho-details .sh{flex-wrap:wrap}
-.homem .ho-det + .ho-det{margin-top:12px}
-.homem .ho-gseg button{height:36px;padding:0 8px}
-@container app (max-width:700px){
-  .homem .set.ho-enum{grid-template-columns:minmax(0,1fr)}
-  .homem .set.ho-enum .ctrl{grid-column:1;grid-row:auto;justify-content:flex-start;margin-top:8px}
+.homem .ho-details .sh .r{max-width:100%}
+.homem .ho-foot{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.homem .ho-foot .cap{margin:0 auto 0 0}
+.homem .ho-day{padding:10px 16px 2px;font-size:12px;font-weight:500;color:var(--fg-3)}
+.homem .ev .tx{color:var(--fg-2);min-width:0;overflow-wrap:anywhere}
+
+/* places */
+.homem .ho-presence{display:flex;align-items:flex-end;flex-wrap:wrap;gap:14px 28px;padding:16px;border-bottom:1px solid var(--line)}
+.homem .ho-presence .mv{font-size:17px}
+.homem .ho-presence .tag{margin-left:auto}
+.homem .ho-zform{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:16px;border-top:1px solid var(--line);background:var(--raised)}
+@container app (min-width:700px){.homem .ho-zform{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 110px}.homem .ho-zform .btns{grid-column:1/-1;justify-content:flex-end}}
+.homem .ho-zform .input{width:100%}
+.homem .ho-recent{border-top:1px solid var(--line);overflow-x:auto}
+
+/* ---------- the Advanced sheet (lives on <body>: viewport queries, not container) ---------- */
+.ho-sheet-host{position:fixed;inset:0;z-index:70}
+.ho-sheet-host[hidden]{display:none}
+.homem .ho-scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;transition:opacity 260ms ease}
+.homem.open .ho-scrim{opacity:1}
+.homem .ho-sheet{position:absolute;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line-2);box-shadow:var(--sh-3);outline:none;overflow:hidden;
+  left:0;right:0;bottom:0;max-height:88dvh;border-radius:14px 14px 0 0;transform:translateY(100%);transition:transform 380ms var(--ease-drawer);will-change:transform}
+.homem.open .ho-sheet{transform:none}
+.homem .ho-grab{display:flex;justify-content:center;padding:10px 0 6px;touch-action:none;cursor:grab;flex:none}
+.homem .ho-grab i{width:36px;height:4px;border-radius:2px;background:var(--line-2)}
+.homem .ho-sheet-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.homem .ho-sh{flex:1;min-height:0;display:flex;flex-direction:column}
+.homem .ho-sh-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (min-width:700px){
+  .homem .ho-sheet{left:auto;top:0;width:min(480px,100%);max-height:none;border-radius:0;border-width:0 0 0 1px;transform:translateX(100%);transition:transform 300ms var(--ease-drawer)}
+  .homem .ho-grab{display:none}
 }
+.homem .ho-sh-head{display:flex;align-items:center;gap:12px;padding:12px 16px 14px;border-bottom:1px solid var(--line);flex:none}
+.homem .ho-sh-head .grow{flex:1;min-width:0;display:grid;gap:2px}
+.homem .ho-sh-head h2{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0}
+@media (min-width:700px){.homem .ho-sh-head{padding-top:16px}}
+.homem .ho-cap{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 16px;padding:12px 16px;border-top:1px solid var(--line)}
+.homem .ho-sh-list .ho-cap:first-child{border-top:0}
+.homem .ho-cap.col{grid-template-columns:minmax(0,1fr)}
+.homem .ho-cap .t{font-weight:500;font-size:13.5px}
+.homem .ho-cap .d{font-size:12px;color:var(--fg-3);margin-top:2px}
+.homem .ho-cap-c{display:flex;justify-content:flex-end;min-width:0}
+.homem .ho-cap.col .ho-cap-c{justify-content:flex-start}
+.homem .ho-cap .seg{flex-wrap:nowrap}
+.homem .ho-mini{display:flex;align-items:center;gap:10px}
+.homem .ho-mini .m{min-width:3.5ch;text-align:center;font-size:15px}
+.homem .ho-stp.sm{width:32px;height:32px}
+.homem .ho-sh-sec{padding:14px 16px;border-top:1px solid var(--line);background:var(--raised)}
+.homem .ho-sh-sec .ml{margin-bottom:8px}
+.homem .ho-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin:0}
+.homem .ho-dl .wide{grid-column:1/-1}
+.homem .ho-dl dt{font-size:11.5px;color:var(--fg-3)}
+.homem .ho-dl dd{margin:2px 0 0;font-size:13px;overflow-wrap:anywhere}
+.homem .ho-dl dd.ho-err{color:var(--err)}
+.homem .ho-sh-foot{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.homem .confirm{border-top:1px solid var(--line);border-bottom:0}
+
+.homem .ho-gseg button{height:36px;padding:0 8px}
 .homem .ho-glyph{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .homem .ho-glyph .unit{fill:currentColor;stroke:none;opacity:.85}
 .homem .ho-glyph .sweep{opacity:.5}
 .homem .ho-glyph .ecobar{stroke-width:1.4}
 .homem .ho-glyph .ecobar.on{fill:currentColor}
-.homem .ho-info{display:flex;align-items:flex-end;gap:12px 24px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--line);background:var(--raised)}
-.homem .ho-info dl{display:flex;flex-wrap:wrap;gap:8px 24px;margin:0;margin-right:auto}
-.homem .ho-info dt{font-size:11.5px;color:var(--fg-3)}
-.homem .ho-info dd{margin:2px 0 0;font-size:13px}
-.homem .ho-foot{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line)}
-.homem .ho-foot .cap{margin:0 auto 0 0}
-.homem .rows:empty + .ho-foot,.homem .empty + .ho-foot{border-top:1px solid var(--line)}
-.homem .ho-day{padding:10px 16px 2px;font-size:12px;font-weight:500;color:var(--fg-3)}
-.homem .ev .tx{color:var(--fg-2);min-width:0;overflow-wrap:anywhere}
 
 /* ---------- editor ---------- */
 .homem .ho-modal{width:min(560px,100%)}
+.homem .ho-erow2{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.homem .ho-code .input{width:96px}
 .homem .ho-form{display:grid;gap:14px;color:var(--fg)}
 .homem .ho-eb{border:1px solid var(--line);border-radius:8px;padding:8px 12px}
 .homem .ho-eb + .ho-eb{margin-top:8px}
@@ -108,7 +173,7 @@
 /* Touch: the shared 26px segments and 20px switch are mouse-sized; give fingers room
    on this page's own controls without changing the shared component. */
 @media (pointer:coarse){
-  .homem .ho-ctl .seg button,.homem .ho-det .seg button{height:36px;padding:0 12px}
+  .homem .ho-ctl .seg button,.homem .ho-cap .seg button{height:36px;padding:0 12px}
   .homem .ho-hours button{height:30px}
   .homem .sw{position:relative}
   .homem .sw::before{content:"";position:absolute;inset:-12px -6px}
@@ -117,7 +182,13 @@
 @media (hover:hover) and (pointer:fine){
   .homem .ho-stp:not(:disabled):hover{background:var(--hover)}
 }
+@media (hover:hover) and (pointer:fine){
+  .homem .ho-scene:hover{border-color:var(--line-2);background:var(--hover)}
+}
 @media (prefers-reduced-motion:reduce){
+  .homem .ho-sheet{transform:none !important;opacity:0;transition:opacity 180ms ease}
+  .homem.open .ho-sheet{opacity:1}
+  .homem .ho-scene,.homem .ho-scene:active{transition:none;transform:none}
   .homem .ho-stp,.homem .ho-v{transition:none}
   .homem .ho-stp:active{transform:none}
 }

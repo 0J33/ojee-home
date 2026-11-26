@@ -61,9 +61,14 @@ supports: **[docs/haier-ac.md](docs/haier-ac.md)**.
 
 ## The page
 
-One page, on ojee-ui v3: the air conditioner once (power, setpoint, mode, fan) beside
-indoor and outdoor-coil temperatures and their history; every other control, scenes,
-automations and the activity log under **Details**. The outdoor reading is the thermistor on
+One page, on ojee-ui v3: the air conditioner's everyday controls (power, setpoint, mode, fan)
+beside indoor and outdoor-coil temperatures and their history; scenes as one-tap shortcuts;
+a summary of automations (on/off, trigger, last run). **Advanced** opens every control and
+reading the driver exposes, drawn from its capability list (a side sheet on a wide screen, a
+draggable bottom sheet on a phone). **Manage** holds scenes, automations, places (the phone's
+presence, zones, recent location reports), devices and the activity log. Scenes are also the
+console overview's quick actions (`scene-<id>` in `quickActions`, `/api/summary.quick`,
+`POST /api/quick/{id}`), beside `ac-power`. The outdoor reading is the thermistor on
 the outdoor unit's coil, not outside air, and is labelled so.
 
 **History** is one sample a minute per device in `/data/history.jsonl` (72 h, compacted on

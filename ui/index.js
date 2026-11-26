@@ -456,11 +456,11 @@ function devicesTab() {
   const list = devices();
   return `<div class="panel">${list.length ? `<div class="rows">${list.map((d) => {
     const s = status(d); const t = d.transport || {};
-    return `<div class="row"><span class="sic">${ic('i-ac')}</span>
+    return `<div class="row ho-drow"><span class="sic">${ic('i-ac')}</span>
       <div class="grow"><div class="t">${esc(d.name)} ${d.simulated ? tag('Simulated') : ''}</div><div class="d"><span class="st"><span class="dot" style="--c:${col(s.s)}"></span><span>${esc(s.text)}</span></span> · ${esc(d.room || 'no room')} · <span class="m">${esc(t.type_id || d.kind)}</span></div></div>
-      <button class="btn sm" data-advanced="${esc(d.id)}">Advanced</button>
+      <div class="ho-dacts"><button class="btn sm" data-advanced="${esc(d.id)}">${ic('i-sliders', 's')}Advanced</button>
       <button class="ib" data-refresh="${esc(d.id)}" aria-label="Read ${esc(d.name)} now">${ic('i-refresh')}</button>
-      <button class="ib" data-rename="${esc(d.id)}" aria-label="Rename ${esc(d.name)}">${ic('i-edit')}</button></div>`;
+      <button class="ib" data-rename="${esc(d.id)}" aria-label="Rename ${esc(d.name)}">${ic('i-edit')}</button></div></div>`;
   }).join('')}</div>` : `<div class="empty">${ic('i-ac')}<b>No devices</b><span>Set AC_HOST, AC_DEVICE_ID and AC_LOCAL_KEY.</span></div>`}</div>`;
 }
 

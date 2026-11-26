@@ -207,6 +207,25 @@ async def summary() -> dict[str, Any]:
                  "threshold": st.get("target_temperature") if on else None, "unit": "°C",
                  "status": "warn" if down else None}
 
+    # The overview row's status: a few words that never truncate. The headline (the
+    # page's subtitle) keeps the full sentence.
+    if alerts:
+        a0 = alerts[0]
+        status_text = ("Fault " + a0["text"].rsplit("fault ", 1)[-1]) if a0["kind"] == "home.ac-fault" \
+            else "AC not answering" if a0["kind"] == "home.ac-unavailable" else "Needs a look"
+    elif parked:
+        status_text = "AC off at the wall"
+    elif on:
+        status_text = f"{mode} to {_fmt(st.get('target_temperature'), 0)}°"
+    elif lead and live:
+        status_text = "AC off"
+    elif lead and lead.get("status") != "unknown":
+        status_text = "Retrying"
+    elif devices:
+        status_text = "Checking…"
+    else:
+        status_text = "No devices"
+
     if alerts:
         headline = alerts[0]["text"]
     elif parked:
@@ -226,6 +245,7 @@ async def summary() -> dict[str, Any]:
     return {
         "status": "err" if any(a["severity"] == "err" for a in alerts) else "warn" if alerts else "ok",
         "headline": headline,
+        "statusText": status_text,
         "facts": facts,
         "metrics": metrics,
         "spark": spark,

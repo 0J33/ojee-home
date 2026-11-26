@@ -193,3 +193,13 @@
   .homem .ho-stp,.homem .ho-v{transition:none}
   .homem .ho-stp:active{transform:none}
 }
+
+/* Manage → Devices: on a phone the actions take their own line under the
+   name, so the status reads in full instead of "Off at the wal…". */
+.homem .ho-drow{flex-wrap:wrap}
+.homem .ho-dacts{display:flex;align-items:center;gap:4px;margin-left:auto}
+@container app (max-width:699px){
+  .homem .ho-drow .grow{flex-basis:calc(100% - 44px)}
+  .homem .ho-drow .d .st{white-space:normal}
+  .homem .ho-dacts{flex-basis:100%;padding-left:44px;margin-left:0}
+}

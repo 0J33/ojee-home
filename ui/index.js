@@ -541,6 +541,12 @@ function render() {
   const sub = lead ? [lead.room || null, lead.transport?.host ? 'local LAN' : null].filter(Boolean).join(' · ') : '';
   const tabs = { scenes: scenesTab, automations: automationsTab, places: placesTab, devices: devicesTab, activity: activityTab };
   const keep = root.querySelector('.ho-det-body')?.scrollTop;
+  // The page scroller (the console's .main, or the document standalone): a full
+  // redraw must not move it. On phones, replacing the focused tab button made
+  // the page jump to the top.
+  const pageScroller = root.closest('.main') || document.scrollingElement;
+  const pageY = pageScroller ? pageScroller.scrollTop : 0;
+  const focusedTab = document.activeElement?.closest?.('[data-tab]')?.dataset.tab;
   const acts = `${state.connected === false ? tag('Reconnecting', 'warn') : ''}${s.hub?.demo ? tag('Demo') : ''}`;
   // Inside the redesigned console the shell draws the page and its header (title +
   // headline); this module only fills its right-hand side. Standalone it draws both.
@@ -562,6 +568,8 @@ function render() {
     </section>
   </div>`;
   if (keep) root.querySelector('.ho-det-body').scrollTop = keep;
+  if (pageScroller && pageScroller.scrollTop !== pageY) pageScroller.scrollTop = pageY;
+  if (focusedTab) root.querySelector(`[data-tab="${focusedTab}"]`)?.focus({ preventScroll: true });
   ui3?.placeSegs(root);
   root.querySelectorAll('[data-chart]').forEach(bindChart);
   renderSheet();

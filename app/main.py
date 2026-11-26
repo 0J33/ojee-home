@@ -61,79 +61,142 @@ async def health() -> dict[str, Any]:
     }
 
 
+ALERT_KINDS: list[dict[str, Any]] = [
+    {"kind": "home.ac-fault", "label": "AC reports a fault code",
+     "description": "The unit itself reports an error code (E-code). Raised once it has held for two reads.",
+     "severity": "err", "channel": "inbox", "holdChecks": 2, "clearMin": 5},
+    {"kind": "home.ac-unavailable", "label": "AC not answering",
+     "description": "No good read for 3 polls spanning 3 minutes. Off at the wall is not a fault and never raises it.",
+     "severity": "warn", "channel": "inbox", "holdChecks": 3, "clearMin": 5,
+     "threshold": {"key": "minutes", "label": "Not answering for", "unit": "min", "default": 3}},
+]
+
+_MODE_LABEL = {"cool": "Cool", "heat": "Heat", "dry": "Dry", "fan": "Fan", "fan_only": "Fan", "auto": "Auto"}
+
+
+def _fmt(v: Any, dp: int = 1) -> str | None:
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f"{f:.{dp}f}" if dp else f"{round(f)}"
+
+
+def _alerts(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Alerts with stable keys: the console matches them across polls by key, so a changing
+    number in the text updates the same item instead of raising a new one."""
+    out: list[dict[str, Any]] = []
+    for d in devices:
+        code = (d.get("state") or {}).get("error_code") or 0
+        if d["available"] and code:
+            out.append({"key": f"home.ac-fault.{d['id']}", "kind": "home.ac-fault",
+                        "severity": "err", "view": "overview",
+                        "text": f"{d['name']} reports fault E{code}",
+                        "detail": "Error code from the unit itself; see the manual or the Haier app.",
+                        # back-compat for consoles that only read `notify`
+                        "notify": "home.ac-fault"})
+        if d.get("down") and not d.get("parked"):
+            mins = max(1, round((time.time() - (d.get("fail_since") or time.time())) / 60))
+            out.append({"key": f"home.ac-unavailable.{d['id']}", "kind": "home.ac-unavailable",
+                        "severity": "warn", "view": "overview",
+                        "text": f"{d['name']} not answering for {mins} min",
+                        "detail": d.get("status_detail") or d.get("last_error") or "",
+                        "notify": "home.ac-unavailable"})
+    return out
+
+
 @app.get("/api/summary")
 async def summary() -> dict[str, Any]:
-    """One object describing this hub from outside, for the console's launcher.
+    """This hub from outside, for the console's overview row and inbox.
 
-    The card has room for a line and four facts, so this answers the two
-    questions someone glancing at the launcher actually has: is the house warm,
-    and is anything broken. A device that cannot be reached — a rotated key, an
-    AC that is off at the wall — becomes an alert, because the whole point of
-    the launcher is to notice that without opening the module.
+    Four numbers (AC, indoor, outdoor coil, humidity or the phone), a 6 h indoor sparkline,
+    and alerts with stable keys. A device that missed one read is not reported as anything:
+    only a sustained failure (`down`) or a fault code from the unit is news. Off at the wall
+    (parked) is how a unit spends the winter and says so without alarming.
     """
     snap = HUB.snapshot()
     devices = snap["devices"]
-    online = [d for d in devices if d["available"]]
-    # Switched off at the wall (a fuse off for the winter) is not broken: no alert for it.
-    broken = [d for d in devices if not d["available"] and not d.get("simulated") and not d.get("parked") and d.get("status") != "unknown"]
-    parked = [d for d in devices if d.get("parked") and not d["available"]]
     presence = snap.get("presence") or {}
+    lead = next((d for d in devices if d["state"].get("indoor_temperature") is not None
+                 and not d.get("down")), devices[0] if devices else None)
+    alerts = _alerts(devices)
+    st = (lead or {}).get("state") or {}
+    live = bool(lead and lead["available"])
+    parked = bool(lead and lead.get("parked") and not lead["available"])
+    down = bool(lead and lead.get("down"))
+    on = bool(st.get("power")) and live
+    mode = _MODE_LABEL.get(str(st.get("mode") or ""), str(st.get("mode") or "").title())
 
-    # The one with a temperature is the one worth leading with.
-    lead = next((d for d in online if d["state"].get("indoor_temperature") is not None), None)
-    facts: list[dict[str, Any]] = []
+    ac_value = ("Off at wall" if parked else "Not answering" if down
+                else f"{mode} {_fmt(st.get('target_temperature'), 0)}°" if on else "Off")
+    hum = st.get("humidity", st.get("indoor_humidity"))
+    metrics = [
+        {"label": "AC", "value": ac_value, "unit": "",
+         "state": "warn" if down else ("ok" if on else None)},
+        {"label": "Indoor", "value": _fmt(st.get("indoor_temperature")) or "—", "unit": "°C",
+         **({"stale": True} if not live else {})},
+        {"label": "Outdoor coil", "value": _fmt(st.get("outdoor_temperature"), 0) or "—", "unit": "°C",
+         **({"stale": True} if not live else {})},
+        ({"label": "Humidity", "value": _fmt(hum, 0), "unit": "%"} if hum is not None else
+         {"label": "Phone", "value": presence.get("zone_name") or ("Away" if presence.get("last_fix") else "—"),
+          "unit": ""}),
+    ]
+
+    spark = None
     if lead:
-        state = lead["state"]
-        facts.append({"k": lead.get("room") or lead["name"], "v": f"{state['indoor_temperature']}°C"})
-        facts.append({"k": "Set to", "v": (f"{state.get('target_temperature')}°C "
-                                           f"{state.get('mode') or ''}".strip()
-                                           if state.get("power") else "standby")})
-        if state.get("outdoor_temperature") is not None:
-            facts.append({"k": "Outside", "v": f"{state['outdoor_temperature']}°C"})
-    for d in parked[:2]:
-        facts.append({"k": d.get("room") or d["name"], "v": "off at the wall"})
-    facts.append({"k": "Devices", "v": f"{len(online)}/{len(devices) - len(parked)} online"
-                  + (f", {len(parked)} off at the wall" if parked else "")})
-    if presence.get("zone_name"):
-        facts.append({"k": "Phone", "v": presence["zone_name"]})
+        rows = HUB.history.series(lead["id"], 6)
+        vals = [r.get("in") for r in rows]
+        nums = [v for v in vals if v is not None]
+        since = HUB.history.on_since(lead["id"])
+        stat = ""
+        if since and nums:
+            start = next((r.get("in") for r in rows if r["t"] >= since and r.get("in") is not None), None)
+            if start is not None:
+                stat = f"{nums[-1] - start:+.1f}° since on"
+        elif nums:
+            stat = f"{min(nums):.1f}–{max(nums):.1f}°"
+        spark = {"label": "Indoor °C · 6h", "values": vals[-120:], "stat": stat,
+                 "threshold": st.get("target_temperature") if on else None, "unit": "°C"}
 
-    alerts = [{
-        "severity": "err",
-        "text": f"{d['name']}: {d.get('status_detail') or d.get('status') or 'unavailable'}",
-        "view": "devices",
-    } for d in broken]
-
-    if broken:
-        headline = f"{broken[0]['name']} needs attention"
-    elif lead and lead["state"].get("power"):
-        headline = (f"{lead['name']} {lead['state'].get('mode') or 'on'} "
-                    f"to {lead['state'].get('target_temperature')}°C")
-    elif parked and not online:
-        headline = f"{parked[0]['name']} switched off at the wall"
+    if alerts:
+        headline = alerts[0]["text"]
+    elif parked:
+        headline = f"{lead['name']} off at the wall"
+    elif on:
+        headline = f"{mode} to {_fmt(st.get('target_temperature'), 0)}° · {_fmt(st.get('indoor_temperature'))}° inside"
+    elif lead and live:
+        headline = f"AC off · {_fmt(st.get('indoor_temperature'))}° inside"
     elif devices:
-        headline = f"{len(online)} of {len(devices)} device{'s' if len(devices) != 1 else ''} online"
+        headline = "AC checking…"
     else:
         headline = "no devices configured"
 
+    facts = [{"k": m["label"], "v": f"{m['value']}{m.get('unit') or ''}"} for m in metrics]
     return {
-        "status": "err" if broken else "ok",
+        "status": "err" if any(a["severity"] == "err" for a in alerts) else "warn" if alerts else "ok",
         "headline": headline,
-        "facts": facts[:4],
+        "facts": facts,
+        "metrics": metrics,
+        "spark": spark,
         "alerts": alerts,
-        # What the console's own object needs to draw THIS house: whether the
-        # unit is running and in which mode, the two temperatures, and whether
-        # anyone is home. Without it the console can only colour a shape.
-        "quick": {
-            "ac-power": {"on": bool(lead and lead["state"].get("power"))},
-        },
-        "model": {
-            "power": bool(lead and lead["state"].get("power")),
-            "mode": (lead or {}).get("state", {}).get("mode"),
-            "indoor": (lead or {}).get("state", {}).get("indoor_temperature"),
-            "target": (lead or {}).get("state", {}).get("target_temperature"),
-            "home": bool(presence.get("home") or presence.get("zone_name")),
-        },
+        "quick": {"ac-power": {"on": on}},
     }
+
+
+@app.get("/api/history")
+async def history(hours: float = 24, device: str | None = None) -> dict[str, Any]:
+    """Temperature samples for the chart: one row per good read, at most one a minute."""
+    hours = max(0.5, min(float(hours), 72.0))
+    dev = device or next(iter(HUB.devices), None)
+    if dev is None or dev not in HUB.devices:
+        raise HTTPException(404, "no such device")
+    rows = HUB.history.series(dev, hours)
+    return {"device": dev, "hours": hours, "poll_seconds": SETTINGS.poll_seconds,
+            "on_since": HUB.history.on_since(dev),
+            "points": [[r["t"], r.get("in"), r.get("out"), r.get("set"), 1 if r.get("on") else 0,
+                        r.get("hum")] for r in rows]}
 
 
 # ---- devices -------------------------------------------------------------
@@ -376,21 +439,24 @@ async def module_manifest() -> dict[str, Any]:
         # The house: the module is the home, and the AC is one thing in it.
         # Its glyph names the module wherever the console lists modules.
         "icon": "i-house",
+        # Two views: the AC and its temperatures, and everything else (all controls, scenes,
+        # automations, activity) behind Details. The old ids (devices, scenes, automations,
+        # activity) still deep-link: the UI maps them onto these two.
         "views": [
-            {"id": "overview", "label": "Overview", "icon": "i-grid"},
-            {"id": "devices", "label": "Devices", "icon": "i-ac"},
-            {"id": "scenes", "label": "Scenes", "icon": "i-scene"},
-            {"id": "automations", "label": "Automate", "icon": "i-auto"},
-            {"id": "activity", "label": "Activity", "icon": "i-log"},
+            {"id": "overview", "label": "Home", "icon": "i-house"},
+            {"id": "details", "label": "Details", "icon": "i-sliders"},
         ],
         "ui": "/ui/index.js",
         "health": "/api/health",
         "capabilities": ["sse", "commands", "summary"],
+        # Every alert this module can raise, for the console's per-kind settings. Alerts on
+        # /api/summary carry `kind` and a stable `key` (home.<kind>.<device>).
+        "alertKinds": ALERT_KINDS,
         # One press on the console's home tile: the lead AC's power. The
         # state it reports rides on /api/summary's `quick`, so the button
         # shows what the house is actually doing.
         "quickActions": [
-            {"id": "ac-power", "label": "AC power", "icon": "i-ac"},
+            {"id": "ac-power", "label": "AC power", "icon": "i-power"},
         ],
     }
 

@@ -30,12 +30,19 @@ class Park(unittest.TestCase):
             d.refresh = refresh
             await h.refresh(did)
             s = await summary()
-            self.assertEqual((s["status"], len(s["alerts"])), ("err", 1))
+            # One missed read is a blip: nothing raised, nothing called unavailable.
+            self.assertEqual((s["status"], s["alerts"]), ("ok", []))
+            self.assertFalse(d.describe()["down"])
+            await h.refresh(did); await h.refresh(did)
+            d.fail_since -= 200          # three misses spanning more than three minutes
+            s = await summary()
+            self.assertEqual(s["status"], "warn")
+            self.assertEqual([a["key"] for a in s["alerts"]], [f"home.ac-unavailable.{did}"])
             h.park(did, True)
             s = await summary()
             self.assertEqual((s["status"], s["alerts"]), ("ok", []))
             self.assertEqual(d.describe()["status"], "parked")
-            self.assertIn("off at the wall", " ".join(f["v"] for f in s["facts"]))
+            self.assertEqual(s["metrics"][0]["value"], "Off at wall")
             # Not looked for on every poll while parked.
             h._parked_tried[did] = __import__("time").time()
             answers["on"] = True

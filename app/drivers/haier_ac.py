@@ -260,7 +260,7 @@ def build_capabilities(spec: Spec) -> list[Capability]:
         # ambient), and it drifts up the longer the unit runs. The official app shows the same
         # byte with a slightly different offset (101-64=37 here vs 101-66=35 there), so neither
         # figure is the weather. Labelling it "Outdoor" invited exactly that misreading.
-        Capability("outdoor_temperature", "Outdoor unit", "readout", unit="°C", icon="outdoor",
+        Capability("outdoor_temperature", "Outdoor coil", "readout", unit="°C", icon="outdoor",
                    hint="Coil sensor on the outdoor unit, not outside air. Runs well above "
                         "ambient whenever the compressor is on."),
     ]

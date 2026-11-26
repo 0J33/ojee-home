@@ -18,6 +18,8 @@ from .config import SETTINGS
 from .drivers.base import Driver
 from .drivers.demo import DemoAC
 from .drivers.haier_ac import HaierAC
+from .drivers.mirror import MirrorAC
+from .history import History
 from .keyfetch import KeyFetcher, KeyFetchError
 from .presence import Presence
 from .store import Store
@@ -54,6 +56,9 @@ class EventBus:
 class Hub:
     def __init__(self) -> None:
         self.store = Store(f"{SETTINGS.data_dir}/hub.json")
+        self.history = History(f"{SETTINGS.data_dir}/history.jsonl")
+        Driver.DOWN_CHECKS = SETTINGS.down_checks
+        Driver.DOWN_SECONDS = float(SETTINGS.down_seconds)
         self.bus = EventBus()
         self.devices: dict[str, Driver] = {}
         self._locks: dict[str, asyncio.Lock] = {}
@@ -69,7 +74,9 @@ class Hub:
 
         for cfg in SETTINGS.acs:
             driver: Driver
-            if SETTINGS.demo or not cfg.local_key:
+            if SETTINGS.mirror_url:
+                driver = MirrorAC(cfg.id, SETTINGS.mirror_url)
+            elif SETTINGS.demo or not cfg.local_key:
                 driver = DemoAC(cfg.id, cfg.name, cfg.room)
             else:
                 driver = HaierAC(cfg)
@@ -226,18 +233,21 @@ class Hub:
 
     async def refresh(self, device_id: str) -> None:
         device = self.devices[device_id]
-        previous = (device.available, dict(device.state))
+        previous = (device.available, device.down, dict(device.state))
         async with self._locks[device_id]:
             await device.refresh()
             # A rotated key is not a fault — fetch a new one and read again in the same slot,
             # so an app-triggered rotation heals within one poll instead of waiting for a human.
             if device.status == "key_rotated" and await self._heal_key(device_id):
                 await device.refresh()
+        device.note_read()
+        if device.available:
+            self.history.record(device_id, device.state)
         # It answered: the power is back, so it is not off at the wall any more.
         if device.parked and device.available:
             self.park(device_id, False)
             return
-        if previous != (device.available, dict(device.state)):
+        if previous != (device.available, device.down, dict(device.state)):
             self.bus.publish("device", device.describe())
 
     async def command(self, device_id: str, command: dict[str, Any]) -> dict[str, Any]:

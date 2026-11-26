@@ -77,12 +77,19 @@ class Settings:
     poll_seconds: int = _env_int("HUB_POLL_SECONDS", 45)
     # Seconds after a write during which we poll faster, to confirm the change landed.
     settle_seconds: int = _env_int("HUB_SETTLE_SECONDS", 6)
+    # A device is called unavailable only after this many failed reads in a row that also
+    # span this many seconds — one missed poll is a blip, not an outage.
+    down_checks: int = _env_int("HUB_DOWN_CHECKS", 3)
+    down_seconds: int = _env_int("HUB_DOWN_SECONDS", 180)
     # Keep this many entries in the activity log.
     activity_limit: int = _env_int("HUB_ACTIVITY_LIMIT", 300)
 
     # Set to "1" to force the simulated driver even when a localKey is present. Useful for
     # UI work without touching real hardware.
     demo: bool = _env("HUB_DEMO", "0") == "1"
+    # Development only: read devices from another hub's /api/state (read only — commands are
+    # refused), so the UI can be worked on against real readings without touching the unit.
+    mirror_url: str = _env("HUB_MIRROR_URL", "")
 
     # Shared secret for the phone's location posts. The hub is already tailnet-only, so this
     # is a second lock rather than the only one; blank disables the check.

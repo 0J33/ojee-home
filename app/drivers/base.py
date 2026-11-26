@@ -43,6 +43,12 @@ class Driver:
     #: device class — drives the icon and grouping in the UI
     kind: str = "generic"
     room: str = ""
+    #: A device is only reported as down after this many failed reads in a row, spanning at
+    #: least DOWN_SECONDS. One missed poll — the AC busy with the phone app's session, a Wi-Fi
+    #: hiccup — is a blip, not an outage, and flagging it made the page cry wolf. The hub sets
+    #: both from HUB_DOWN_CHECKS / HUB_DOWN_SECONDS.
+    DOWN_CHECKS: int = 3
+    DOWN_SECONDS: float = 180.0
     #: True when this device is a stand-in rather than real hardware. Reported to the UI so
     #: the status strip cannot claim "live" while a simulator is answering — the hub-level
     #: demo flag is not enough, since a missing key substitutes a simulator on its own.
@@ -60,6 +66,27 @@ class Driver:
         self.status_detail: str = ""
         self.last_seen: float | None = None
         self.last_error: str = ""
+        #: Consecutive failed reads, and when the first of them happened.
+        self.fail_streak: int = 0
+        self.fail_since: float | None = None
+
+    @property
+    def down(self) -> bool:
+        """Sustained failure: unavailable for DOWN_CHECKS reads AND DOWN_SECONDS."""
+        if self.available or self.parked or self.fail_since is None:
+            return False
+        return (self.fail_streak >= self.DOWN_CHECKS
+                and time.time() - self.fail_since >= self.DOWN_SECONDS)
+
+    def note_read(self) -> None:
+        """Called by the hub after every read attempt, to keep the failure streak."""
+        if self.available:
+            self.fail_streak = 0
+            self.fail_since = None
+        else:
+            self.fail_streak += 1
+            if self.fail_since is None:
+                self.fail_since = time.time()
 
     # ---- introspection -------------------------------------------------
     def capabilities(self) -> list[Capability]:
@@ -84,6 +111,11 @@ class Driver:
             # setpoint as though it came off the unit.
             "stale": not self.available,
             "last_error": self.last_error,
+            # available=false on its own is one missed read; `down` is the sustained kind
+            # (see DOWN_CHECKS). The UI and the summary only call a device unavailable on this.
+            "down": self.down,
+            "fail_streak": self.fail_streak,
+            "fail_since": self.fail_since,
             "state": self.state,
             "capabilities": [
                 {
